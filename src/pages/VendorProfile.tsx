@@ -346,24 +346,44 @@ const VendorProfile = () => {
             return;
           }
 
-          // Insert into user_roles table
-          const roleData = {
-            vendor_id: vendorId,
-            user_email: roleInfo.userEmail,
-            role: roleInfo.role,
-            access_level: roleInfo.accessLevel,
-            department: roleInfo.department,
-            is_primary_contact: roleInfo.isPrimaryContact
-          };
-
-          const { error: roleError } = await supabase
+          // First, check if this combination already exists
+          const { data: existingRole } = await supabase
             .from('user_roles')
-            .upsert(roleData, { 
-              onConflict: 'vendor_id,user_email',
-              ignoreDuplicates: false 
-            });
+            .select('id')
+            .eq('vendor_id', vendorId)
+            .eq('user_email', roleInfo.userEmail)
+            .eq('role', roleInfo.role)
+            .single();
 
-          if (roleError) throw roleError;
+          if (existingRole) {
+            // Update existing role
+            const { error: roleUpdateError } = await supabase
+              .from('user_roles')
+              .update({
+                access_level: roleInfo.accessLevel,
+                department: roleInfo.department,
+                is_primary_contact: roleInfo.isPrimaryContact
+              })
+              .eq('id', existingRole.id);
+
+            if (roleUpdateError) throw roleUpdateError;
+          } else {
+            // Insert new role
+            const roleData = {
+              vendor_id: vendorId,
+              user_email: roleInfo.userEmail,
+              role: roleInfo.role,
+              access_level: roleInfo.accessLevel,
+              department: roleInfo.department,
+              is_primary_contact: roleInfo.isPrimaryContact
+            };
+
+            const { error: roleError } = await supabase
+              .from('user_roles')
+              .insert(roleData);
+
+            if (roleError) throw roleError;
+          }
           break;
 
         case 'compliance':
@@ -429,6 +449,30 @@ const VendorProfile = () => {
 
       toast.success(`${sectionId} information saved successfully!`);
       
+      // Clear form after successful save for roles and compliance
+      if (sectionId === 'roles') {
+        setRoleInfo({
+          userEmail: '',
+          role: '',
+          accessLevel: '',
+          department: '',
+          isPrimaryContact: false
+        });
+      }
+      
+      if (sectionId === 'compliance') {
+        setComplianceInfo({
+          complianceType: '',
+          status: '',
+          certificationName: '',
+          issueDate: '',
+          expiryDate: '',
+          issuingAuthority: '',
+          complianceScore: '',
+          notes: ''
+        });
+      }
+      
       // Update progress
       const completedSections = sections.filter(s => s.id !== 'audit').length;
       const currentIndex = sections.findIndex(s => s.id === sectionId);
@@ -443,6 +487,7 @@ const VendorProfile = () => {
 
   const sendConfirmationEmail = async (sectionId: string) => {
     try {
+      console.log('Sending confirmation email for section:', sectionId);
       const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
         body: {
           email: currentUser?.email,
@@ -454,11 +499,13 @@ const VendorProfile = () => {
 
       if (error) {
         console.error('Error sending confirmation email:', error);
+        toast.error('Section saved but email notification failed');
       } else {
-        console.log('Confirmation email sent successfully');
+        console.log('Confirmation email sent successfully:', data);
       }
     } catch (error) {
       console.error('Error in sendConfirmationEmail:', error);
+      toast.error('Section saved but email notification failed');
     }
   };
 

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,7 +43,8 @@ const VendorAuth = () => {
 
   const sendAuthConfirmationEmail = async (email: string, vendorId: string, action: 'signup' | 'signin') => {
     try {
-      await supabase.functions.invoke('send-confirmation-email', {
+      console.log(`Sending ${action} confirmation email to:`, email);
+      const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
         body: {
           email,
           vendorId,
@@ -50,9 +52,17 @@ const VendorAuth = () => {
           action
         }
       });
-      console.log(`${action} confirmation email sent to ${email}`);
+
+      if (error) {
+        console.error(`Error sending ${action} confirmation email:`, error);
+        toast.error(`${action} successful but email notification failed`);
+      } else {
+        console.log(`${action} confirmation email sent successfully:`, data);
+        toast.success(`${action} successful! Confirmation email sent to ${email}`);
+      }
     } catch (error) {
       console.error(`Error sending ${action} confirmation email:`, error);
+      toast.error(`${action} successful but email notification failed`);
     }
   };
 
@@ -126,11 +136,6 @@ const VendorAuth = () => {
           user_agent: navigator.userAgent
         });
 
-      // Send confirmation email
-      await sendAuthConfirmationEmail(signUpData.email, signUpData.vendorId, 'signup');
-
-      toast.success('Account created successfully! Confirmation email sent.');
-      
       // Store user session
       localStorage.setItem('currentUser', JSON.stringify({
         id: userData.id,
@@ -138,6 +143,9 @@ const VendorAuth = () => {
         vendorId: userData.vendor_id,
         isAuthenticated: true
       }));
+
+      // Send confirmation email
+      await sendAuthConfirmationEmail(signUpData.email, signUpData.vendorId, 'signup');
 
       // Clear pending vendor data
       localStorage.removeItem('pendingVendor');
@@ -190,11 +198,6 @@ const VendorAuth = () => {
           user_agent: navigator.userAgent
         });
 
-      // Send confirmation email
-      await sendAuthConfirmationEmail(signInData.email, userData.vendor_id, 'signin');
-
-      toast.success('Signed in successfully! Confirmation email sent.');
-      
       // Store user session
       localStorage.setItem('currentUser', JSON.stringify({
         id: userData.id,
@@ -202,6 +205,9 @@ const VendorAuth = () => {
         vendorId: userData.vendor_id,
         isAuthenticated: true
       }));
+
+      // Send confirmation email
+      await sendAuthConfirmationEmail(signInData.email, userData.vendor_id, 'signin');
 
       // Navigate to vendor profile
       navigate('/vendor-profile');
