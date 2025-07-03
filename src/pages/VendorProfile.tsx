@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,7 @@ const VendorProfile = () => {
   const [progress, setProgress] = useState(16);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [vendorExists, setVendorExists] = useState(false);
 
   const [generalInfo, setGeneralInfo] = useState({
     vendorId: '',
@@ -110,8 +110,93 @@ const VendorProfile = () => {
     loadVendorData(user.vendorId);
   }, [navigate]);
 
+  const ensureVendorExists = async (vendorId: string) => {
+    try {
+      console.log('Checking if vendor exists:', vendorId);
+      
+      // Check if vendor exists
+      const { data: existingVendor, error: checkError } = await supabase
+        .from('vendors')
+        .select('vendor_id')
+        .eq('vendor_id', vendorId)
+        .single();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        console.error('Error checking vendor:', checkError);
+        return false;
+      }
+
+      if (existingVendor) {
+        console.log('Vendor exists');
+        setVendorExists(true);
+        return true;
+      }
+
+      console.log('Vendor does not exist, creating...');
+      
+      // Create vendor record if it doesn't exist
+      const { error: createError } = await supabase
+        .from('vendors')
+        .insert({
+          vendor_id: vendorId,
+          legal_entity_name: generalInfo.legalEntityName || 'Pending',
+          trade_name: generalInfo.tradeName || null,
+          vendor_type: generalInfo.businessType || 'corporation',
+          street_address: 'Pending',
+          city: 'Pending',
+          state: 'Pending',
+          postal_code: '00000',
+          country: 'USA',
+          contact_name: currentUser?.email || 'Pending',
+          email: currentUser?.email || 'pending@example.com',
+          phone_number: null,
+          business_description: generalInfo.businessDescription || null,
+          website: generalInfo.website || null,
+          year_established: generalInfo.yearEstablished || null,
+          employee_count: generalInfo.employeeCount || null,
+          annual_revenue: generalInfo.annualRevenue || null
+        });
+
+      if (createError) {
+        console.error('Error creating vendor:', createError);
+        toast.error('Failed to create vendor record');
+        return false;
+      }
+
+      console.log('Vendor created successfully');
+      setVendorExists(true);
+      return true;
+    } catch (error) {
+      console.error('Error in ensureVendorExists:', error);
+      return false;
+    }
+  };
+
   const loadVendorData = async (vendorId: string) => {
     try {
+      await ensureVendorExists(vendorId);
+
+      // Load vendor basic data
+      const { data: vendorData } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('vendor_id', vendorId)
+        .single();
+
+      if (vendorData) {
+        setGeneralInfo({
+          vendorId: vendorData.vendor_id,
+          legalEntityName: vendorData.legal_entity_name || '',
+          tradeName: vendorData.trade_name || '',
+          businessType: vendorData.vendor_type || '',
+          website: vendorData.website || '',
+          yearEstablished: vendorData.year_established || '',
+          employeeCount: vendorData.employee_count || '',
+          annualRevenue: vendorData.annual_revenue || '',
+          businessDescription: vendorData.business_description || ''
+        });
+      }
+
       // Load vendor profile data
       const { data: profileData } = await supabase
         .from('vendor_profiles')
@@ -189,8 +274,13 @@ const VendorProfile = () => {
         return;
       }
 
-      let dataToSave;
-      let tableName = '';
+      // Ensure vendor exists before saving any section
+      const vendorReady = await ensureVendorExists(vendorId);
+      if (!vendorReady) {
+        toast.error('Failed to prepare vendor record');
+        return;
+      }
+
       let updateData = {};
 
       switch (sectionId) {
@@ -251,6 +341,11 @@ const VendorProfile = () => {
           break;
 
         case 'roles':
+          if (!roleInfo.userEmail || !roleInfo.role) {
+            toast.error('Please fill in required fields: User Email and Role');
+            return;
+          }
+
           // Insert into user_roles table
           const roleData = {
             vendor_id: vendorId,
@@ -263,12 +358,20 @@ const VendorProfile = () => {
 
           const { error: roleError } = await supabase
             .from('user_roles')
-            .upsert(roleData);
+            .upsert(roleData, { 
+              onConflict: 'vendor_id,user_email',
+              ignoreDuplicates: false 
+            });
 
           if (roleError) throw roleError;
           break;
 
         case 'compliance':
+          if (!complianceInfo.complianceType || !complianceInfo.status) {
+            toast.error('Please fill in required fields: Compliance Type and Status');
+            return;
+          }
+
           // Insert into compliance_tracking table
           const complianceData = {
             vendor_id: vendorId,
@@ -284,7 +387,7 @@ const VendorProfile = () => {
 
           const { error: complianceError } = await supabase
             .from('compliance_tracking')
-            .upsert(complianceData);
+            .insert(complianceData);
 
           if (complianceError) throw complianceError;
           break;
@@ -321,6 +424,9 @@ const VendorProfile = () => {
           user_agent: navigator.userAgent
         });
 
+      // Send confirmation email
+      await sendConfirmationEmail(sectionId);
+
       toast.success(`${sectionId} information saved successfully!`);
       
       // Update progress
@@ -329,9 +435,30 @@ const VendorProfile = () => {
       const newProgress = Math.min(((currentIndex + 1) / completedSections) * 100, 100);
       setProgress(newProgress);
 
-    } catch (error) {
+    } catch (error: any) {
       console.error(`Error saving ${sectionId}:`, error);
-      toast.error(`Failed to save ${sectionId} information`);
+      toast.error(`Failed to save ${sectionId} information: ${error.message}`);
+    }
+  };
+
+  const sendConfirmationEmail = async (sectionId: string) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          email: currentUser?.email,
+          vendorId: currentUser?.vendorId,
+          section: sectionId,
+          action: 'section_updated'
+        }
+      });
+
+      if (error) {
+        console.error('Error sending confirmation email:', error);
+      } else {
+        console.log('Confirmation email sent successfully');
+      }
+    } catch (error) {
+      console.error('Error in sendConfirmationEmail:', error);
     }
   };
 
@@ -617,6 +744,130 @@ const VendorProfile = () => {
 
       <Button onClick={() => handleSaveSection('financial')} className="w-full">
         Save Financial Information
+      </Button>
+    </div>
+  );
+
+  const renderProcurementInfo = () => (
+    <div className="space-y-6">
+      <div>
+        <Label htmlFor="servicesOffered">Services Offered</Label>
+        <Textarea
+          id="servicesOffered"
+          value={procurementInfo.servicesOffered}
+          onChange={(e) => setProcurementInfo(prev => ({ ...prev, servicesOffered: e.target.value }))}
+          placeholder="List services offered"
+          rows={3}
+        />
+      </div>
+      <div>
+        <Label htmlFor="primaryContact">Primary Contact</Label>
+        <Input
+          id="primaryContact"
+          value={procurementInfo.primaryContact}
+          onChange={(e) => setProcurementInfo(prev => ({ ...prev, primaryContact: e.target.value }))}
+          placeholder="Primary contact name"
+        />
+      </div>
+      <div>
+        <Label htmlFor="secondaryContact">Secondary Contact</Label>
+        <Input
+          id="secondaryContact"
+          value={procurementInfo.secondaryContact}
+          onChange={(e) => setProcurementInfo(prev => ({ ...prev, secondaryContact: e.target.value }))}
+          placeholder="Secondary contact name"
+        />
+      </div>
+      <div>
+        <Label htmlFor="relationshipOwner">Relationship Owner</Label>
+        <Input
+          id="relationshipOwner"
+          value={procurementInfo.relationshipOwner}
+          onChange={(e) => setProcurementInfo(prev => ({ ...prev, relationshipOwner: e.target.value }))}
+          placeholder="Relationship owner"
+        />
+      </div>
+      <div>
+        <Label htmlFor="contractDetails">Contract Details</Label>
+        <Textarea
+          id="contractDetails"
+          value={procurementInfo.contractDetails}
+          onChange={(e) => setProcurementInfo(prev => ({ ...prev, contractDetails: e.target.value }))}
+          placeholder="Contract details"
+          rows={3}
+        />
+      </div>
+      <div>
+        <Label htmlFor="certifications">Certifications</Label>
+        <Textarea
+          id="certifications"
+          value={procurementInfo.certifications}
+          onChange={(e) => setProcurementInfo(prev => ({ ...prev, certifications: e.target.value }))}
+          placeholder="Certifications"
+          rows={3}
+        />
+      </div>
+
+      <Button onClick={() => handleSaveSection('procurement')} className="w-full">
+        Save Procurement Information
+      </Button>
+    </div>
+  );
+
+  const renderRegulatoryInfo = () => (
+    <div className="space-y-6">
+      <div>
+        <Label htmlFor="complianceForms">Compliance Forms</Label>
+        <Textarea
+          id="complianceForms"
+          value={regulatoryInfo.complianceForms}
+          onChange={(e) => setRegulatoryInfo(prev => ({ ...prev, complianceForms: e.target.value }))}
+          placeholder="Compliance forms"
+          rows={3}
+        />
+      </div>
+      <div>
+        <Label htmlFor="reconciliationAccount">Reconciliation Account</Label>
+        <Input
+          id="reconciliationAccount"
+          value={regulatoryInfo.reconciliationAccount}
+          onChange={(e) => setRegulatoryInfo(prev => ({ ...prev, reconciliationAccount: e.target.value }))}
+          placeholder="Reconciliation account"
+        />
+      </div>
+      <div>
+        <Label htmlFor="regulatoryNotes">Regulatory Notes</Label>
+        <Textarea
+          id="regulatoryNotes"
+          value={regulatoryInfo.regulatoryNotes}
+          onChange={(e) => setRegulatoryInfo(prev => ({ ...prev, regulatoryNotes: e.target.value }))}
+          placeholder="Regulatory notes"
+          rows={3}
+        />
+      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="lastAuditDate">Last Audit Date</Label>
+          <Input
+            id="lastAuditDate"
+            type="date"
+            value={regulatoryInfo.lastAuditDate}
+            onChange={(e) => setRegulatoryInfo(prev => ({ ...prev, lastAuditDate: e.target.value }))}
+          />
+        </div>
+        <div>
+          <Label htmlFor="nextAuditDate">Next Audit Date</Label>
+          <Input
+            id="nextAuditDate"
+            type="date"
+            value={regulatoryInfo.nextAuditDate}
+            onChange={(e) => setRegulatoryInfo(prev => ({ ...prev, nextAuditDate: e.target.value }))}
+          />
+        </div>
+      </div>
+
+      <Button onClick={() => handleSaveSection('regulatory')} className="w-full">
+        Save Regulatory Information
       </Button>
     </div>
   );
@@ -1064,7 +1315,7 @@ const VendorProfile = () => {
                   >
                     {section.icon}
                     <span className="ml-2">{section.name}</span>
-                    {section.id === 'general' && <CheckCircle className="h-4 w-4 ml-auto text-green-500" />}
+                    {section.id === 'general' && vendorExists && <CheckCircle className="h-4 w-4 ml-auto text-green-500" />}
                   </Button>
                 ))}
               </CardContent>
@@ -1081,6 +1332,9 @@ const VendorProfile = () => {
               </CardHeader>
               <CardContent>
                 {currentSection === 'general' && renderGeneralInfo()}
+                {currentSection === 'financial' && renderFinancialInfo()}
+                {currentSection === 'procurement' && renderProcurementInfo()}
+                {currentSection === 'regulatory' && renderRegulatoryInfo()}
                 {currentSection === 'roles' && renderRoleAccess()}
                 {currentSection === 'compliance' && renderComplianceTracking()}
                 {currentSection === 'documents' && renderDocumentManagement()}

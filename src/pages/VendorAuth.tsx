@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +40,22 @@ const VendorAuth = () => {
     }
   }, []);
 
+  const sendAuthConfirmationEmail = async (email: string, vendorId: string, action: 'signup' | 'signin') => {
+    try {
+      await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          email,
+          vendorId,
+          section: 'authentication',
+          action
+        }
+      });
+      console.log(`${action} confirmation email sent to ${email}`);
+    } catch (error) {
+      console.error(`Error sending ${action} confirmation email:`, error);
+    }
+  };
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -71,7 +86,11 @@ const VendorAuth = () => {
 
       if (userError) {
         console.error('Error creating user:', userError);
-        toast.error('Failed to create user account');
+        if (userError.code === '23505') {
+          toast.error('User with this email already exists');
+        } else {
+          toast.error('Failed to create user account');
+        }
         return;
       }
 
@@ -107,7 +126,10 @@ const VendorAuth = () => {
           user_agent: navigator.userAgent
         });
 
-      toast.success('Account created successfully!');
+      // Send confirmation email
+      await sendAuthConfirmationEmail(signUpData.email, signUpData.vendorId, 'signup');
+
+      toast.success('Account created successfully! Confirmation email sent.');
       
       // Store user session
       localStorage.setItem('currentUser', JSON.stringify({
@@ -168,7 +190,10 @@ const VendorAuth = () => {
           user_agent: navigator.userAgent
         });
 
-      toast.success('Signed in successfully!');
+      // Send confirmation email
+      await sendAuthConfirmationEmail(signInData.email, userData.vendor_id, 'signin');
+
+      toast.success('Signed in successfully! Confirmation email sent.');
       
       // Store user session
       localStorage.setItem('currentUser', JSON.stringify({
