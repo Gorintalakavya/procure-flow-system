@@ -1,17 +1,19 @@
 
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ArrowLeft, Building2, Check } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const VendorRegistration = () => {
   const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     legalEntityName: '',
     tradeName: '',
@@ -24,14 +26,15 @@ const VendorRegistration = () => {
     contactName: '',
     email: '',
     phoneNumber: '',
-    businessDescription: ''
+    businessDescription: '',
+    website: '',
+    yearEstablished: '',
+    employeeCount: '',
+    annualRevenue: ''
   });
 
   const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -39,183 +42,235 @@ const VendorRegistration = () => {
     
     // Validate required fields
     const requiredFields = ['legalEntityName', 'vendorType', 'streetAddress', 'city', 'state', 'postalCode', 'country', 'contactName', 'email'];
-    const missingFields = requiredFields.filter(field => !formData[field]);
+    const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
     
     if (missingFields.length > 0) {
       toast.error('Please fill in all required fields marked with *');
       return;
     }
 
+    setIsSubmitting(true);
+
     try {
-      // Generate a unique vendor ID (10 digits)
-      const vendorId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
+      // Generate vendor ID using the database function
+      const { data: vendorIdData, error: vendorIdError } = await supabase
+        .rpc('generate_vendor_id');
+
+      if (vendorIdError) {
+        console.error('Error generating vendor ID:', vendorIdError);
+        toast.error('Failed to generate vendor ID');
+        return;
+      }
+
+      const vendorId = vendorIdData;
+
+      // Insert vendor data
+      const { data: vendorData, error: vendorError } = await supabase
+        .from('vendors')
+        .insert({
+          vendor_id: vendorId,
+          legal_entity_name: formData.legalEntityName,
+          trade_name: formData.tradeName || null,
+          vendor_type: formData.vendorType,
+          street_address: formData.streetAddress,
+          city: formData.city,
+          state: formData.state,
+          postal_code: formData.postalCode,
+          country: formData.country,
+          contact_name: formData.contactName,
+          email: formData.email,
+          phone_number: formData.phoneNumber || null,
+          business_description: formData.businessDescription || null,
+          website: formData.website || null,
+          year_established: formData.yearEstablished || null,
+          employee_count: formData.employeeCount || null,
+          annual_revenue: formData.annualRevenue || null,
+          registration_status: 'pending'
+        })
+        .select()
+        .single();
+
+      if (vendorError) {
+        console.error('Error creating vendor:', vendorError);
+        toast.error('Failed to register vendor');
+        return;
+      }
+
+      // Log the registration action
+      await supabase
+        .from('audit_logs')
+        .insert({
+          vendor_id: vendorId,
+          action: 'REGISTER',
+          entity_type: 'vendor',
+          entity_id: vendorId,
+          new_values: formData,
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        });
+
+      toast.success(`Vendor registered successfully! Your Vendor ID is: ${vendorId}`);
       
-      console.log('Vendor Registration Data:', { ...formData, vendorId });
-      
-      // Here you would normally save to Supabase
-      // For now, we'll simulate success and navigate to auth page
-      toast.success('Registration successful! Please sign up to complete your profile.');
-      
-      // Store vendor data temporarily in localStorage for the next step
-      localStorage.setItem('pendingVendorData', JSON.stringify({ ...formData, vendorId }));
-      
+      // Store vendor info for the auth page
+      localStorage.setItem('pendingVendor', JSON.stringify({
+        vendorId: vendorId,
+        email: formData.email,
+        contactName: formData.contactName
+      }));
+
+      // Navigate to auth page
       navigate('/vendor-auth');
+
     } catch (error) {
       console.error('Registration error:', error);
-      toast.error('Registration failed. Please try again.');
+      toast.error('An unexpected error occurred during registration');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <header className="bg-white shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/')}
-              className="flex items-center space-x-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Home</span>
-            </Button>
-            <div className="flex items-center space-x-2">
-              <Building2 className="h-6 w-6 text-blue-600" />
-              <span className="font-semibold text-gray-900">Vendor Registration</span>
+            <div className="flex items-center space-x-3">
+              <Building2 className="h-10 w-10 text-blue-600" />
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900">Vendor Registration</h1>
+                <p className="text-gray-600">Register your business with our procurement portal</p>
+              </div>
             </div>
+            <Button variant="outline" onClick={() => navigate('/')}>
+              Back to Home
+            </Button>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card className="shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-gray-900">
-              New Vendor Registration
-            </CardTitle>
-            <p className="text-gray-600 mt-2">
-              Please provide your business information to begin the registration process.
-              Fields marked with * are required.
-            </p>
+      {/* Registration Form */}
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-2xl">Business Information</CardTitle>
+            <CardDescription>
+              Please provide accurate information about your business. Fields marked with * are required.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Business Information */}
+              {/* Company Information */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div>
-                  <Label htmlFor="legalEntityName" className="flex items-center">
-                    Legal Entity Name <span className="text-red-500 ml-1">*</span>
-                  </Label>
+                  <Label htmlFor="legalEntityName">Legal Entity Name *</Label>
                   <Input
                     id="legalEntityName"
                     value={formData.legalEntityName}
                     onChange={(e) => handleInputChange('legalEntityName', e.target.value)}
-                    placeholder="Enter legal business name"
+                    placeholder="Enter your legal business name"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="tradeName">Trade Name (Optional)</Label>
+                  <Label htmlFor="tradeName">Trade Name</Label>
                   <Input
                     id="tradeName"
                     value={formData.tradeName}
                     onChange={(e) => handleInputChange('tradeName', e.target.value)}
-                    placeholder="Enter trade name if different"
+                    placeholder="Enter your trade name (if different)"
                   />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="vendorType" className="flex items-center">
-                  Vendor Type/Category <span className="text-red-500 ml-1">*</span>
-                </Label>
-                <Select onValueChange={(value) => handleInputChange('vendorType', value)} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select vendor type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manufacturer">Manufacturer</SelectItem>
-                    <SelectItem value="distributor">Distributor</SelectItem>
-                    <SelectItem value="service-provider">Service Provider</SelectItem>
-                    <SelectItem value="consultant">Consultant</SelectItem>
-                    <SelectItem value="contractor">Contractor</SelectItem>
-                    <SelectItem value="supplier">Supplier</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="vendorType">Vendor Type/Category *</Label>
+                  <Select onValueChange={(value) => handleInputChange('vendorType', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vendor type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manufacturer">Manufacturer</SelectItem>
+                      <SelectItem value="distributor">Distributor</SelectItem>
+                      <SelectItem value="service-provider">Service Provider</SelectItem>
+                      <SelectItem value="consultant">Consultant</SelectItem>
+                      <SelectItem value="contractor">Contractor</SelectItem>
+                      <SelectItem value="supplier">Supplier</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="website">Website</Label>
+                  <Input
+                    id="website"
+                    value={formData.website}
+                    onChange={(e) => handleInputChange('website', e.target.value)}
+                    placeholder="https://www.yourcompany.com"
+                    type="url"
+                  />
+                </div>
               </div>
 
               {/* Address Information */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Address Information</h3>
+                <h3 className="text-lg font-medium">Business Address</h3>
                 <div>
-                  <Label htmlFor="streetAddress" className="flex items-center">
-                    Street Address <span className="text-red-500 ml-1">*</span>
-                  </Label>
+                  <Label htmlFor="streetAddress">Street Address *</Label>
                   <Input
                     id="streetAddress"
                     value={formData.streetAddress}
                     onChange={(e) => handleInputChange('streetAddress', e.target.value)}
-                    placeholder="Enter street address"
+                    placeholder="Enter your street address"
                     required
                   />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="city" className="flex items-center">
-                      City <span className="text-red-500 ml-1">*</span>
-                    </Label>
+                    <Label htmlFor="city">City *</Label>
                     <Input
                       id="city"
                       value={formData.city}
                       onChange={(e) => handleInputChange('city', e.target.value)}
-                      placeholder="City"
+                      placeholder="Enter city"
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="state" className="flex items-center">
-                      State/Province <span className="text-red-500 ml-1">*</span>
-                    </Label>
+                    <Label htmlFor="state">State *</Label>
                     <Input
                       id="state"
                       value={formData.state}
                       onChange={(e) => handleInputChange('state', e.target.value)}
-                      placeholder="State/Province"
+                      placeholder="Enter state"
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="postalCode" className="flex items-center">
-                      Postal Code <span className="text-red-500 ml-1">*</span>
-                    </Label>
+                    <Label htmlFor="postalCode">Postal Code *</Label>
                     <Input
                       id="postalCode"
                       value={formData.postalCode}
                       onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                      placeholder="Postal Code"
+                      placeholder="Enter postal code"
                       required
                     />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="country" className="flex items-center">
-                    Country <span className="text-red-500 ml-1">*</span>
-                  </Label>
-                  <Select onValueChange={(value) => handleInputChange('country', value)} required>
+                  <Label htmlFor="country">Country *</Label>
+                  <Select onValueChange={(value) => handleInputChange('country', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select country" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="us">United States</SelectItem>
-                      <SelectItem value="ca">Canada</SelectItem>
-                      <SelectItem value="uk">United Kingdom</SelectItem>
-                      <SelectItem value="de">Germany</SelectItem>
-                      <SelectItem value="fr">France</SelectItem>
-                      <SelectItem value="in">India</SelectItem>
-                      <SelectItem value="au">Australia</SelectItem>
-                      <SelectItem value="jp">Japan</SelectItem>
+                      <SelectItem value="US">United States</SelectItem>
+                      <SelectItem value="CA">Canada</SelectItem>
+                      <SelectItem value="UK">United Kingdom</SelectItem>
+                      <SelectItem value="AU">Australia</SelectItem>
+                      <SelectItem value="IN">India</SelectItem>
+                      <SelectItem value="DE">Germany</SelectItem>
+                      <SelectItem value="FR">France</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -223,30 +278,26 @@ const VendorRegistration = () => {
 
               {/* Contact Information */}
               <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-gray-900">Contact Information</h3>
+                <h3 className="text-lg font-medium">Contact Information</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="contactName" className="flex items-center">
-                      Contact Name <span className="text-red-500 ml-1">*</span>
-                    </Label>
+                    <Label htmlFor="contactName">Contact Name *</Label>
                     <Input
                       id="contactName"
                       value={formData.contactName}
                       onChange={(e) => handleInputChange('contactName', e.target.value)}
-                      placeholder="Primary contact name"
+                      placeholder="Enter primary contact name"
                       required
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email" className="flex items-center">
-                      Email Address <span className="text-red-500 ml-1">*</span>
-                    </Label>
+                    <Label htmlFor="email">Email Address *</Label>
                     <Input
                       id="email"
                       type="email"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
-                      placeholder="business@example.com"
+                      placeholder="Enter email address"
                       required
                     />
                   </div>
@@ -255,37 +306,84 @@ const VendorRegistration = () => {
                   <Label htmlFor="phoneNumber">Phone Number</Label>
                   <Input
                     id="phoneNumber"
-                    type="tel"
                     value={formData.phoneNumber}
                     onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                    placeholder="+1 (555) 123-4567"
+                    placeholder="Enter phone number"
                   />
                 </div>
               </div>
 
-              {/* Business Description */}
-              <div>
-                <Label htmlFor="businessDescription">Business Description</Label>
-                <Textarea
-                  id="businessDescription"
-                  value={formData.businessDescription}
-                  onChange={(e) => handleInputChange('businessDescription', e.target.value)}
-                  placeholder="Describe your products or services..."
-                  rows={4}
-                />
+              {/* Business Details */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Business Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="yearEstablished">Year Established</Label>
+                    <Input
+                      id="yearEstablished"
+                      value={formData.yearEstablished}
+                      onChange={(e) => handleInputChange('yearEstablished', e.target.value)}
+                      placeholder="YYYY"
+                      pattern="[0-9]{4}"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="employeeCount">Employee Count</Label>
+                    <Select onValueChange={(value) => handleInputChange('employeeCount', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1-10">1-10</SelectItem>
+                        <SelectItem value="11-50">11-50</SelectItem>
+                        <SelectItem value="51-200">51-200</SelectItem>
+                        <SelectItem value="201-1000">201-1000</SelectItem>
+                        <SelectItem value="1000+">1000+</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="annualRevenue">Annual Revenue</Label>
+                    <Select onValueChange={(value) => handleInputChange('annualRevenue', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="under-1m">Under $1M</SelectItem>
+                        <SelectItem value="1m-10m">$1M - $10M</SelectItem>
+                        <SelectItem value="10m-50m">$10M - $50M</SelectItem>
+                        <SelectItem value="50m-100m">$50M - $100M</SelectItem>
+                        <SelectItem value="over-100m">Over $100M</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="businessDescription">Business Description</Label>
+                  <Textarea
+                    id="businessDescription"
+                    value={formData.businessDescription}
+                    onChange={(e) => handleInputChange('businessDescription', e.target.value)}
+                    placeholder="Describe your business, products, and services..."
+                    rows={4}
+                  />
+                </div>
               </div>
 
               {/* Submit Button */}
-              <div className="flex justify-center pt-6">
-                <Button type="submit" size="lg" className="px-12">
-                  <Check className="h-4 w-4 mr-2" />
-                  Register Interest
+              <div className="flex justify-end pt-6">
+                <Button 
+                  type="submit" 
+                  className="px-8 py-3 text-lg"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Processing...' : 'Register Interest'}
                 </Button>
               </div>
             </form>
           </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   );
 };

@@ -1,29 +1,45 @@
 
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Eye, EyeOff } from "lucide-react";
+import { Building2, Mail, Lock, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { supabase } from "@/integrations/supabase/client";
 
 const VendorAuth = () => {
   const navigate = useNavigate();
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isSignUp, setIsSignUp] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [pendingVendor, setPendingVendor] = useState<any>(null);
   
   const [signUpData, setSignUpData] = useState({
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    vendorId: ''
   });
 
   const [signInData, setSignInData] = useState({
     email: '',
     password: ''
   });
+
+  useEffect(() => {
+    // Check if we have pending vendor data from registration
+    const pendingData = localStorage.getItem('pendingVendor');
+    if (pendingData) {
+      const vendor = JSON.parse(pendingData);
+      setPendingVendor(vendor);
+      setSignUpData(prev => ({
+        ...prev,
+        email: vendor.email,
+        vendorId: vendor.vendorId
+      }));
+    }
+  }, []);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,229 +49,334 @@ const VendorAuth = () => {
       return;
     }
 
-    if (signUpData.password.length < 8) {
-      toast.error('Password must be at least 8 characters long');
+    if (signUpData.password.length < 6) {
+      toast.error('Password must be at least 6 characters');
       return;
     }
 
+    setIsLoading(true);
+
     try {
-      // Get pending vendor data from localStorage
-      const pendingData = localStorage.getItem('pendingVendorData');
-      if (!pendingData) {
-        toast.error('Registration data not found. Please register again.');
-        navigate('/vendor-registration');
+      // Create user in our users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .insert({
+          email: signUpData.email,
+          password_hash: signUpData.password, // In production, this should be properly hashed
+          vendor_id: signUpData.vendorId,
+          is_authenticated: true
+        })
+        .select()
+        .single();
+
+      if (userError) {
+        console.error('Error creating user:', userError);
+        toast.error('Failed to create user account');
         return;
       }
 
-      const vendorData = JSON.parse(pendingData);
-      
-      // Generate user ID
-      const userId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
-      
-      console.log('Sign Up Data:', {
-        ...signUpData,
-        userId,
-        vendorId: vendorData.vendorId,
-        vendorData
-      });
+      // Create initial vendor profile
+      await supabase
+        .from('vendor_profiles')
+        .insert({
+          vendor_id: signUpData.vendorId,
+          user_id: userData.id
+        });
 
-      // Here you would create the user account in Supabase
-      // For now, we'll simulate success and navigate to profile
+      // Create default notification preferences
+      await supabase
+        .from('notification_preferences')
+        .insert({
+          vendor_id: signUpData.vendorId,
+          email_notifications: true,
+          status_updates: true,
+          document_reminders: true,
+          compliance_alerts: true
+        });
+
+      // Log the signup action
+      await supabase
+        .from('audit_logs')
+        .insert({
+          vendor_id: signUpData.vendorId,
+          user_id: userData.id,
+          action: 'SIGNUP',
+          entity_type: 'user',
+          entity_id: userData.id,
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        });
+
+      toast.success('Account created successfully!');
       
-      // Store auth data
+      // Store user session
       localStorage.setItem('currentUser', JSON.stringify({
-        userId,
-        vendorId: vendorData.vendorId,
-        email: signUpData.email,
+        id: userData.id,
+        email: userData.email,
+        vendorId: userData.vendor_id,
         isAuthenticated: true
       }));
 
-      // Clear pending data
-      localStorage.removeItem('pendingVendorData');
+      // Clear pending vendor data
+      localStorage.removeItem('pendingVendor');
 
-      toast.success('Account created successfully! Please complete your vendor profile.');
+      // Navigate to vendor profile
       navigate('/vendor-profile');
+
     } catch (error) {
       console.error('Sign up error:', error);
-      toast.error('Sign up failed. Please try again.');
+      toast.error('An unexpected error occurred during sign up');
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+    setIsLoading(true);
+
     try {
-      console.log('Sign In Data:', signInData);
+      // Authenticate user
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('*')
+        .eq('email', signInData.email)
+        .eq('password_hash', signInData.password) // In production, properly hash and compare
+        .single();
+
+      if (userError || !userData) {
+        toast.error('Invalid email or password');
+        return;
+      }
+
+      // Update authentication status
+      await supabase
+        .from('users')
+        .update({ is_authenticated: true })
+        .eq('id', userData.id);
+
+      // Log the signin action
+      await supabase
+        .from('audit_logs')
+        .insert({
+          vendor_id: userData.vendor_id,
+          user_id: userData.id,
+          action: 'SIGNIN',
+          entity_type: 'user',
+          entity_id: userData.id,
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        });
+
+      toast.success('Signed in successfully!');
       
-      // Here you would authenticate with Supabase
-      // For now, we'll simulate success
-      
-      // Generate user session data
-      const userId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
-      const vendorId = Math.floor(1000000000 + Math.random() * 9000000000).toString();
-      
+      // Store user session
       localStorage.setItem('currentUser', JSON.stringify({
-        userId,
-        vendorId,
-        email: signInData.email,
+        id: userData.id,
+        email: userData.email,
+        vendorId: userData.vendor_id,
         isAuthenticated: true
       }));
 
-      toast.success('Sign in successful!');
+      // Navigate to vendor profile
       navigate('/vendor-profile');
+
     } catch (error) {
       console.error('Sign in error:', error);
-      toast.error('Sign in failed. Please check your credentials.');
+      toast.error('An unexpected error occurred during sign in');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <Button
-              variant="ghost"
-              onClick={() => navigate('/vendor-registration')}
-              className="flex items-center space-x-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Registration</span>
-            </Button>
-            <div className="flex items-center space-x-2">
-              <Building2 className="h-6 w-6 text-blue-600" />
-              <span className="font-semibold text-gray-900">Vendor Portal</span>
-            </div>
-          </div>
-        </div>
-      </header>
+  const handleForgotPassword = () => {
+    toast.info('Password reset functionality will be implemented soon');
+  };
 
-      {/* Main Content */}
-      <main className="max-w-md mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card className="shadow-lg">
-          <CardHeader className="text-center">
-            <CardTitle className="text-2xl font-bold text-gray-900">
-              Vendor Portal Access
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+      <div className="max-w-md w-full mx-4">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <Building2 className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+          <h1 className="text-3xl font-bold text-gray-900">Vendor Portal</h1>
+          <p className="text-gray-600 mt-2">Access your vendor account</p>
+          {pendingVendor && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <p className="text-sm text-green-800">
+                Registration successful! Vendor ID: <strong>{pendingVendor.vendorId}</strong>
+              </p>
+              <p className="text-sm text-green-600">Please create your account to continue.</p>
+            </div>
+          )}
+        </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-center">
+              {isSignUp ? 'Create Account' : 'Sign In'}
             </CardTitle>
-            <p className="text-gray-600 mt-2">
-              Sign up or sign in to manage your vendor profile
-            </p>
+            <CardDescription className="text-center">
+              {isSignUp 
+                ? 'Create your vendor account to access the portal' 
+                : 'Sign in to your vendor account'
+              }
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signup" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="signup" className="space-y-4">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div>
-                    <Label htmlFor="signup-email">Email Address *</Label>
+            {isSignUp ? (
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div>
+                  <Label htmlFor="vendorId">Vendor ID</Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      id="signup-email"
+                      id="vendorId"
+                      value={signUpData.vendorId}
+                      onChange={(e) => setSignUpData(prev => ({ ...prev, vendorId: e.target.value }))}
+                      placeholder="Enter your vendor ID"
+                      className="pl-10"
+                      disabled={!!pendingVendor}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="email"
                       type="email"
                       value={signUpData.email}
                       onChange={(e) => setSignUpData(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="Enter your email"
+                      className="pl-10"
+                      disabled={!!pendingVendor}
                       required
                     />
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="signup-password">Password *</Label>
-                    <div className="relative">
-                      <Input
-                        id="signup-password"
-                        type={showPassword ? "text" : "password"}
-                        value={signUpData.password}
-                        onChange={(e) => setSignUpData(prev => ({ ...prev, password: e.target.value }))}
-                        placeholder="Create a password"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowPassword(!showPassword)}
-                      >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <Label htmlFor="confirm-password">Confirm Password *</Label>
-                    <div className="relative">
-                      <Input
-                        id="confirm-password"
-                        type={showConfirmPassword ? "text" : "password"}
-                        value={signUpData.confirmPassword}
-                        onChange={(e) => setSignUpData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                        placeholder="Confirm your password"
-                        required
-                      />
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      >
-                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <Button type="submit" className="w-full">
-                    Sign Up
-                  </Button>
-                </form>
-              </TabsContent>
-              
-              <TabsContent value="signin" className="space-y-4">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div>
-                    <Label htmlFor="signin-email">Email Address</Label>
+                </div>
+
+                <div>
+                  <Label htmlFor="password">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      id="signin-email"
+                      id="password"
+                      type="password"
+                      value={signUpData.password}
+                      onChange={(e) => setSignUpData(prev => ({ ...prev, password: e.target.value }))}
+                      placeholder="Create a password"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="confirmPassword"
+                      type="password"
+                      value={signUpData.confirmPassword}
+                      onChange={(e) => setSignUpData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                      placeholder="Confirm your password"
+                      className="pl-10"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Creating Account...' : 'Sign Up'}
+                </Button>
+              </form>
+            ) : (
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div>
+                  <Label htmlFor="signInEmail">Email Address</Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      id="signInEmail"
                       type="email"
                       value={signInData.email}
                       onChange={(e) => setSignInData(prev => ({ ...prev, email: e.target.value }))}
                       placeholder="Enter your email"
+                      className="pl-10"
                       required
                     />
                   </div>
-                  
-                  <div>
-                    <Label htmlFor="signin-password">Password</Label>
+                </div>
+
+                <div>
+                  <Label htmlFor="signInPassword">Password</Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                     <Input
-                      id="signin-password"
+                      id="signInPassword"
                       type="password"
                       value={signInData.password}
                       onChange={(e) => setSignInData(prev => ({ ...prev, password: e.target.value }))}
                       placeholder="Enter your password"
+                      className="pl-10"
                       required
                     />
                   </div>
-                  
-                  <Button type="submit" className="w-full">
-                    Sign In
-                  </Button>
-                  
-                  <div className="text-center">
-                    <Button variant="link" className="text-sm">
-                      Forgot Password?
-                    </Button>
-                  </div>
-                </form>
-              </TabsContent>
-            </Tabs>
+                </div>
+
+                <Button 
+                  type="submit" 
+                  className="w-full"
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Signing In...' : 'Sign In'}
+                </Button>
+
+                <Button 
+                  type="button" 
+                  variant="ghost" 
+                  className="w-full"
+                  onClick={handleForgotPassword}
+                >
+                  Forgot Password?
+                </Button>
+              </form>
+            )}
+
+            <div className="mt-6 text-center">
+              <p className="text-sm text-gray-600">
+                {isSignUp ? 'Already have an account?' : "Don't have an account?"}
+              </p>
+              <Button
+                variant="link"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-blue-600 hover:text-blue-800"
+              >
+                {isSignUp ? 'Sign In' : 'Sign Up'}
+              </Button>
+            </div>
+
+            <div className="mt-4 text-center">
+              <Button
+                variant="outline"
+                onClick={() => navigate('/')}
+                className="w-full"
+              >
+                Back to Home
+              </Button>
+            </div>
           </CardContent>
         </Card>
-      </main>
+      </div>
     </div>
   );
 };
