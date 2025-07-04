@@ -22,37 +22,26 @@ const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      // Check if user exists and has admin role
-      const { data: userData, error: userError } = await supabase
-        .from('users')
+      // Check if admin user exists with correct credentials
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
         .select('*')
         .eq('email', loginData.email)
         .eq('password_hash', loginData.password) // In production, properly hash and compare
+        .eq('is_active', true)
         .single();
 
-      if (userError || !userData) {
+      if (adminError || !adminData) {
         toast.error('Invalid email or password');
-        return;
-      }
-
-      // Check if user has admin role
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_email', loginData.email)
-        .eq('role', 'admin')
-        .single();
-
-      if (roleError || !roleData) {
-        toast.error('Access denied. Admin privileges required.');
         return;
       }
 
       // Store admin session
       localStorage.setItem('adminUser', JSON.stringify({
-        id: userData.id,
-        email: userData.email,
-        role: 'admin',
+        id: adminData.id,
+        email: adminData.email,
+        name: adminData.name,
+        role: adminData.role,
         isAuthenticated: true
       }));
 

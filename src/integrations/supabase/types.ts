@@ -9,6 +9,39 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_users: {
+        Row: {
+          created_at: string | null
+          email: string
+          id: string
+          is_active: boolean | null
+          name: string | null
+          password_hash: string
+          role: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email: string
+          id?: string
+          is_active?: boolean | null
+          name?: string | null
+          password_hash: string
+          role?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_active?: boolean | null
+          name?: string | null
+          password_hash?: string
+          role?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       analytics_reports: {
         Row: {
           compliance_rate: number | null
@@ -492,70 +525,115 @@ export type Database = {
       vendors: {
         Row: {
           annual_revenue: string | null
+          bank_account_details: string | null
           business_description: string | null
           city: string
           contact_name: string
+          contact_phone: string | null
+          contract_effective_date: string | null
+          contract_expiration_date: string | null
           country: string
           created_at: string | null
+          currency: string | null
           email: string
           employee_count: string | null
           id: string
           legal_entity_name: string
+          payment_terms: string | null
           phone_number: string | null
           postal_code: string
+          products_services_description: string | null
+          reconciliation_account: string | null
           registration_status: string | null
+          relationship_owner: string | null
           state: string
           street_address: string
+          street_address_line2: string | null
+          tax_id: string | null
           trade_name: string | null
           updated_at: string | null
+          vat_id: string | null
           vendor_id: string
           vendor_type: string
+          w8_ben_e_status: string | null
+          w8_ben_status: string | null
+          w9_status: string | null
           website: string | null
           year_established: string | null
         }
         Insert: {
           annual_revenue?: string | null
+          bank_account_details?: string | null
           business_description?: string | null
           city: string
           contact_name: string
+          contact_phone?: string | null
+          contract_effective_date?: string | null
+          contract_expiration_date?: string | null
           country: string
           created_at?: string | null
+          currency?: string | null
           email: string
           employee_count?: string | null
           id?: string
           legal_entity_name: string
+          payment_terms?: string | null
           phone_number?: string | null
           postal_code: string
+          products_services_description?: string | null
+          reconciliation_account?: string | null
           registration_status?: string | null
+          relationship_owner?: string | null
           state: string
           street_address: string
+          street_address_line2?: string | null
+          tax_id?: string | null
           trade_name?: string | null
           updated_at?: string | null
+          vat_id?: string | null
           vendor_id: string
           vendor_type: string
+          w8_ben_e_status?: string | null
+          w8_ben_status?: string | null
+          w9_status?: string | null
           website?: string | null
           year_established?: string | null
         }
         Update: {
           annual_revenue?: string | null
+          bank_account_details?: string | null
           business_description?: string | null
           city?: string
           contact_name?: string
+          contact_phone?: string | null
+          contract_effective_date?: string | null
+          contract_expiration_date?: string | null
           country?: string
           created_at?: string | null
+          currency?: string | null
           email?: string
           employee_count?: string | null
           id?: string
           legal_entity_name?: string
+          payment_terms?: string | null
           phone_number?: string | null
           postal_code?: string
+          products_services_description?: string | null
+          reconciliation_account?: string | null
           registration_status?: string | null
+          relationship_owner?: string | null
           state?: string
           street_address?: string
+          street_address_line2?: string | null
+          tax_id?: string | null
           trade_name?: string | null
           updated_at?: string | null
+          vat_id?: string | null
           vendor_id?: string
           vendor_type?: string
+          w8_ben_e_status?: string | null
+          w8_ben_status?: string | null
+          w9_status?: string | null
           website?: string | null
           year_established?: string | null
         }
