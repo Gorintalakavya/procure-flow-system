@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2 } from "lucide-react";
+import { Building2, CheckCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,6 +15,8 @@ import { supabase } from "@/integrations/supabase/client";
 const VendorRegistration = () => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [currentTab, setCurrentTab] = useState('general');
+  const [completedTabs, setCompletedTabs] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     // General Information
     legalEntityName: '',
@@ -35,19 +37,16 @@ const VendorRegistration = () => {
     yearEstablished: '',
     employeeCount: '',
     annualRevenue: '',
-    // Financial Information
     taxId: '',
     vatId: '',
     paymentTerms: '',
     bankAccountDetails: '',
     currency: 'USD',
-    // Procurement Information
     relationshipOwner: '',
     productsServicesDescription: '',
     contractEffectiveDate: '',
     contractExpirationDate: '',
     reconciliationAccount: '',
-    // Compliance Information
     w9Status: '',
     w8BenStatus: '',
     w8BenEStatus: ''
@@ -57,10 +56,45 @@ const VendorRegistration = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const validateCurrentTab = (tab: string) => {
+    switch (tab) {
+      case 'general':
+        return formData.legalEntityName && formData.vendorType && formData.streetAddress && 
+               formData.city && formData.state && formData.postalCode && formData.country && 
+               formData.contactName && formData.email;
+      case 'financial':
+        return true; // Financial fields are optional
+      case 'procurement':
+        return true; // Procurement fields are optional
+      case 'compliance':
+        return true; // Compliance fields are optional
+      default:
+        return false;
+    }
+  };
+
+  const handleTabChange = (newTab: string) => {
+    if (validateCurrentTab(currentTab)) {
+      if (!completedTabs.includes(currentTab)) {
+        setCompletedTabs(prev => [...prev, currentTab]);
+      }
+    }
+    setCurrentTab(newTab);
+  };
+
+  const canProceedToSubmit = () => {
+    const allTabs = ['general', 'financial', 'procurement', 'compliance'];
+    return allTabs.every(tab => completedTabs.includes(tab) || tab === currentTab && validateCurrentTab(tab));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields
+    if (!canProceedToSubmit()) {
+      toast.error('Please complete all required sections');
+      return;
+    }
+
     const requiredFields = ['legalEntityName', 'vendorType', 'streetAddress', 'city', 'state', 'postalCode', 'country', 'contactName', 'email'];
     const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
     
@@ -84,7 +118,6 @@ const VendorRegistration = () => {
 
       const vendorId = vendorIdData;
 
-      // Insert vendor data with all fields
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
         .insert({
@@ -107,19 +140,16 @@ const VendorRegistration = () => {
           year_established: formData.yearEstablished || null,
           employee_count: formData.employeeCount || null,
           annual_revenue: formData.annualRevenue || null,
-          // Financial fields
           tax_id: formData.taxId || null,
           vat_id: formData.vatId || null,
           payment_terms: formData.paymentTerms || null,
           bank_account_details: formData.bankAccountDetails || null,
           currency: formData.currency,
-          // Procurement fields
           relationship_owner: formData.relationshipOwner || null,
           products_services_description: formData.productsServicesDescription || formData.businessDescription || null,
           contract_effective_date: formData.contractEffectiveDate || null,
           contract_expiration_date: formData.contractExpirationDate || null,
           reconciliation_account: formData.reconciliationAccount || null,
-          // Compliance fields
           w9_status: formData.w9Status || null,
           w8_ben_status: formData.w8BenStatus || null,
           w8_ben_e_status: formData.w8BenEStatus || null,
@@ -134,7 +164,6 @@ const VendorRegistration = () => {
         return;
       }
 
-      // Log the registration action
       await supabase
         .from('audit_logs')
         .insert({
@@ -149,14 +178,12 @@ const VendorRegistration = () => {
 
       toast.success(`Vendor registered successfully! Your Vendor ID is: ${vendorId}`);
       
-      // Store vendor info for the auth page
       localStorage.setItem('pendingVendor', JSON.stringify({
         vendorId: vendorId,
         email: formData.email,
         contactName: formData.contactName
       }));
 
-      // Navigate to auth page
       navigate('/vendor-auth');
 
     } catch (error) {
@@ -169,7 +196,6 @@ const VendorRegistration = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Header */}
       <header className="bg-white shadow-lg">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
@@ -187,7 +213,6 @@ const VendorRegistration = () => {
         </div>
       </header>
 
-      {/* Registration Form */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Card>
           <CardHeader>
@@ -198,17 +223,28 @@ const VendorRegistration = () => {
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit}>
-              <Tabs defaultValue="general" className="w-full">
+              <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
                 <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="general">General Info</TabsTrigger>
-                  <TabsTrigger value="financial">Financial</TabsTrigger>
-                  <TabsTrigger value="procurement">Procurement</TabsTrigger>
-                  <TabsTrigger value="compliance">Compliance</TabsTrigger>
+                  <TabsTrigger value="general" className="flex items-center gap-2">
+                    {completedTabs.includes('general') && <CheckCircle className="h-4 w-4 text-green-500" />}
+                    General Info
+                  </TabsTrigger>
+                  <TabsTrigger value="financial" className="flex items-center gap-2">
+                    {completedTabs.includes('financial') && <CheckCircle className="h-4 w-4 text-green-500" />}
+                    Financial
+                  </TabsTrigger>
+                  <TabsTrigger value="procurement" className="flex items-center gap-2">
+                    {completedTabs.includes('procurement') && <CheckCircle className="h-4 w-4 text-green-500" />}
+                    Procurement
+                  </TabsTrigger>
+                  <TabsTrigger value="compliance" className="flex items-center gap-2">
+                    {completedTabs.includes('compliance') && <CheckCircle className="h-4 w-4 text-green-500" />}
+                    Compliance
+                  </TabsTrigger>
                 </TabsList>
 
                 {/* General Information Tab */}
                 <TabsContent value="general" className="space-y-6">
-                  {/* Company Information */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="legalEntityName">Legal Entity Name *</Label>
@@ -260,7 +296,6 @@ const VendorRegistration = () => {
                     </div>
                   </div>
 
-                  {/* Address Information */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">Business Address</h3>
                     <div>
@@ -333,7 +368,6 @@ const VendorRegistration = () => {
                     </div>
                   </div>
 
-                  {/* Contact Information */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">Contact Information</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -381,7 +415,6 @@ const VendorRegistration = () => {
                     </div>
                   </div>
 
-                  {/* Business Details */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">Business Details</h3>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -439,7 +472,6 @@ const VendorRegistration = () => {
                   </div>
                 </TabsContent>
 
-                {/* Financial Information Tab */}
                 <TabsContent value="financial" className="space-y-6">
                   <h3 className="text-lg font-medium">Financial and Tax Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -509,7 +541,6 @@ const VendorRegistration = () => {
                   </div>
                 </TabsContent>
 
-                {/* Procurement Information Tab */}
                 <TabsContent value="procurement" className="space-y-6">
                   <h3 className="text-lg font-medium">Procurement & Relationship Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -566,7 +597,6 @@ const VendorRegistration = () => {
                   </div>
                 </TabsContent>
 
-                {/* Compliance Information Tab */}
                 <TabsContent value="compliance" className="space-y-6">
                   <h3 className="text-lg font-medium">Regulatory & Compliance Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -618,16 +648,18 @@ const VendorRegistration = () => {
                   </div>
                 </TabsContent>
 
-                {/* Submit Button */}
-                <div className="flex justify-end pt-6">
-                  <Button 
-                    type="submit" 
-                    className="px-8 py-3 text-lg"
-                    disabled={isSubmitting}
-                  >
-                    {isSubmitting ? 'Processing...' : 'Register Vendor'}
-                  </Button>
-                </div>
+                {/* Register Button - Only show after completing all sections */}
+                {canProceedToSubmit() && (
+                  <div className="flex justify-end pt-6">
+                    <Button 
+                      type="submit" 
+                      className="px-8 py-3 text-lg"
+                      disabled={isSubmitting}
+                    >
+                      {isSubmitting ? 'Processing...' : 'Register Vendor'}
+                    </Button>
+                  </div>
+                )}
               </Tabs>
             </form>
           </CardContent>
