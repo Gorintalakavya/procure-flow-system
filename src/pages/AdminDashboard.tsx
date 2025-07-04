@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,7 +14,11 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  Eye
+  Eye,
+  UserCheck,
+  AlertTriangle,
+  Bell,
+  Archive
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -79,11 +82,36 @@ const AdminDashboard = () => {
         return;
       }
 
+      // Send confirmation email
+      const vendor = vendors.find(v => v.vendor_id === vendorId);
+      if (vendor) {
+        await sendConfirmationEmail(vendor.email, vendorId, 'vendor_status', status);
+      }
+
       toast.success(`Vendor ${status} successfully`);
       loadDashboardData(); // Refresh data
     } catch (error) {
       console.error('Error updating vendor status:', error);
       toast.error('An error occurred while updating vendor status');
+    }
+  };
+
+  const sendConfirmationEmail = async (email: string, vendorId: string, section: string, action: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          email,
+          vendorId,
+          section,
+          action
+        }
+      });
+
+      if (error) {
+        console.error('Error sending confirmation email:', error);
+      }
+    } catch (error) {
+      console.error('Error invoking email function:', error);
     }
   };
 
@@ -111,7 +139,7 @@ const AdminDashboard = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-slate-600">Welcome, {adminUser.email}</span>
+              <span className="text-sm text-slate-600">Welcome, {adminUser.name || adminUser.email}</span>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="h-4 w-4 mr-2" />
                 Logout
@@ -173,269 +201,383 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        {/* Vendor Management */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Vendor Management</CardTitle>
-            <CardDescription>Review and manage vendor registrations</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="list" className="w-full">
-              <TabsList>
-                <TabsTrigger value="list">Vendor List</TabsTrigger>
-                <TabsTrigger value="details">Vendor Details</TabsTrigger>
-              </TabsList>
+        {/* Main Content Tabs */}
+        <Tabs defaultValue="vendor-management" className="w-full">
+          <TabsList className="grid w-full grid-cols-6">
+            <TabsTrigger value="vendor-management">Vendor Management</TabsTrigger>
+            <TabsTrigger value="role-access">Role-Based Access</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance Tracking</TabsTrigger>
+            <TabsTrigger value="documents">Document Management</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics & Reporting</TabsTrigger>
+            <TabsTrigger value="audit">Audit & Notifications</TabsTrigger>
+          </TabsList>
 
-              <TabsContent value="list" className="space-y-4">
-                {vendors.map((vendor) => (
-                  <div key={vendor.id} className="flex items-center justify-between p-4 border rounded-lg">
-                    <div className="flex-1">
-                      <h3 className="font-semibold">{vendor.legal_entity_name}</h3>
-                      <p className="text-sm text-slate-600">{vendor.email}</p>
-                      <p className="text-sm text-slate-500">Vendor ID: {vendor.vendor_id}</p>
-                      <p className="text-sm text-slate-500">Type: {vendor.vendor_type}</p>
-                    </div>
-                    <div className="flex items-center space-x-3">
-                      <Badge 
-                        variant={
-                          vendor.registration_status === 'approved' ? 'default' :
-                          vendor.registration_status === 'pending' ? 'secondary' : 'destructive'
-                        }
-                      >
-                        {vendor.registration_status}
-                      </Badge>
-                      <Button 
-                        size="sm" 
-                        variant="outline"
-                        onClick={() => setSelectedVendor(vendor)}
-                      >
-                        <Eye className="h-4 w-4 mr-1" />
-                        View Details
-                      </Button>
-                      {vendor.registration_status === 'pending' && (
-                        <div className="flex space-x-2">
+          {/* Vendor Management Tab */}
+          <TabsContent value="vendor-management">
+            <Card>
+              <CardHeader>
+                <CardTitle>Vendor Management</CardTitle>
+                <CardDescription>Review and manage vendor registrations with complete information</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="list" className="w-full">
+                  <TabsList>
+                    <TabsTrigger value="list">Vendor List</TabsTrigger>
+                    <TabsTrigger value="details">Vendor Details</TabsTrigger>
+                  </TabsList>
+
+                  <TabsContent value="list" className="space-y-4">
+                    {vendors.map((vendor) => (
+                      <div key={vendor.id} className="flex items-center justify-between p-4 border rounded-lg">
+                        <div className="flex-1">
+                          <h3 className="font-semibold">{vendor.legal_entity_name}</h3>
+                          <p className="text-sm text-slate-600">{vendor.email}</p>
+                          <p className="text-sm text-slate-500">Vendor ID: {vendor.vendor_id}</p>
+                          <p className="text-sm text-slate-500">Type: {vendor.vendor_type}</p>
+                        </div>
+                        <div className="flex items-center space-x-3">
+                          <Badge 
+                            variant={
+                              vendor.registration_status === 'approved' ? 'default' :
+                              vendor.registration_status === 'pending' ? 'secondary' : 'destructive'
+                            }
+                          >
+                            {vendor.registration_status}
+                          </Badge>
                           <Button 
                             size="sm" 
-                            onClick={() => handleVendorStatusChange(vendor.vendor_id, 'approved')}
+                            variant="outline"
+                            onClick={() => setSelectedVendor(vendor)}
                           >
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Approve
+                            <Eye className="h-4 w-4 mr-1" />
+                            View Details
                           </Button>
-                          <Button 
-                            size="sm" 
-                            variant="destructive"
-                            onClick={() => handleVendorStatusChange(vendor.vendor_id, 'rejected')}
+                          {vendor.registration_status === 'pending' && (
+                            <div className="flex space-x-2">
+                              <Button 
+                                size="sm" 
+                                onClick={() => handleVendorStatusChange(vendor.vendor_id, 'approved')}
+                              >
+                                <CheckCircle className="h-4 w-4 mr-1" />
+                                Approve
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="destructive"
+                                onClick={() => handleVendorStatusChange(vendor.vendor_id, 'rejected')}
+                              >
+                                <XCircle className="h-4 w-4 mr-1" />
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </TabsContent>
+
+                  <TabsContent value="details">
+                    {selectedVendor ? (
+                      <div className="space-y-6">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-2xl font-bold">{selectedVendor.legal_entity_name}</h3>
+                          <Badge 
+                            variant={
+                              selectedVendor.registration_status === 'approved' ? 'default' :
+                              selectedVendor.registration_status === 'pending' ? 'secondary' : 'destructive'
+                            }
                           >
-                            <XCircle className="h-4 w-4 mr-1" />
-                            Reject
-                          </Button>
+                            {selectedVendor.registration_status}
+                          </Badge>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </TabsContent>
 
-              <TabsContent value="details">
-                {selectedVendor ? (
-                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h3 className="text-2xl font-bold">{selectedVendor.legal_entity_name}</h3>
-                      <Badge 
-                        variant={
-                          selectedVendor.registration_status === 'approved' ? 'default' :
-                          selectedVendor.registration_status === 'pending' ? 'secondary' : 'destructive'
-                        }
-                      >
-                        {selectedVendor.registration_status}
-                      </Badge>
-                    </div>
+                        {/* I. General Information */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>I. General Information</CardTitle>
+                          </CardHeader>
+                          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Legal Entity Name</label>
+                              <p className="text-sm">{selectedVendor.legal_entity_name}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Trade Name</label>
+                              <p className="text-sm">{selectedVendor.trade_name || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Vendor ID</label>
+                              <p className="text-sm">{selectedVendor.vendor_id}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Vendor Type</label>
+                              <p className="text-sm">{selectedVendor.vendor_type}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="text-sm font-medium text-slate-600">Address</label>
+                              <p className="text-sm">
+                                {selectedVendor.street_address}
+                                {selectedVendor.street_address_line2 && `, ${selectedVendor.street_address_line2}`}
+                                <br />
+                                {selectedVendor.city}, {selectedVendor.state} {selectedVendor.postal_code}
+                                <br />
+                                {selectedVendor.country}
+                              </p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Contact Name</label>
+                              <p className="text-sm">{selectedVendor.contact_name}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Contact Email</label>
+                              <p className="text-sm">{selectedVendor.email}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Contact Phone</label>
+                              <p className="text-sm">{selectedVendor.contact_phone || selectedVendor.phone_number || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Website</label>
+                              <p className="text-sm">{selectedVendor.website || 'N/A'}</p>
+                            </div>
+                          </CardContent>
+                        </Card>
 
-                    {/* I. General Information */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>I. General Information</CardTitle>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Legal Entity Name</label>
-                          <p className="text-sm">{selectedVendor.legal_entity_name}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Trade Name</label>
-                          <p className="text-sm">{selectedVendor.trade_name || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Vendor ID</label>
-                          <p className="text-sm">{selectedVendor.vendor_id}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Vendor Type</label>
-                          <p className="text-sm">{selectedVendor.vendor_type}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-sm font-medium text-slate-600">Address</label>
-                          <p className="text-sm">
-                            {selectedVendor.street_address}
-                            {selectedVendor.street_address_line2 && `, ${selectedVendor.street_address_line2}`}
-                            <br />
-                            {selectedVendor.city}, {selectedVendor.state} {selectedVendor.postal_code}
-                            <br />
-                            {selectedVendor.country}
-                          </p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Contact Name</label>
-                          <p className="text-sm">{selectedVendor.contact_name}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Contact Email</label>
-                          <p className="text-sm">{selectedVendor.email}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Contact Phone</label>
-                          <p className="text-sm">{selectedVendor.contact_phone || selectedVendor.phone_number || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Website</label>
-                          <p className="text-sm">{selectedVendor.website || 'N/A'}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        {/* II. Financial and Tax Information */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>II. Financial and Tax Information</CardTitle>
+                          </CardHeader>
+                          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Tax ID</label>
+                              <p className="text-sm">{selectedVendor.tax_id || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">VAT ID</label>
+                              <p className="text-sm">{selectedVendor.vat_id || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Payment Terms</label>
+                              <p className="text-sm">{selectedVendor.payment_terms || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Currency</label>
+                              <p className="text-sm">{selectedVendor.currency || 'USD'}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="text-sm font-medium text-slate-600">Bank Account Details</label>
+                              <p className="text-sm">{selectedVendor.bank_account_details || 'N/A'}</p>
+                            </div>
+                          </CardContent>
+                        </Card>
 
-                    {/* II. Financial and Tax Information */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>II. Financial and Tax Information</CardTitle>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Tax ID</label>
-                          <p className="text-sm">{selectedVendor.tax_id || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">VAT ID</label>
-                          <p className="text-sm">{selectedVendor.vat_id || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Payment Terms</label>
-                          <p className="text-sm">{selectedVendor.payment_terms || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Currency</label>
-                          <p className="text-sm">{selectedVendor.currency || 'USD'}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-sm font-medium text-slate-600">Bank Account Details</label>
-                          <p className="text-sm">{selectedVendor.bank_account_details || 'N/A'}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        {/* III. Procurement & Relationship Information */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>III. Procurement & Relationship Information</CardTitle>
+                          </CardHeader>
+                          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Relationship Owner</label>
+                              <p className="text-sm">{selectedVendor.relationship_owner || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Reconciliation Account</label>
+                              <p className="text-sm">{selectedVendor.reconciliation_account || 'N/A'}</p>
+                            </div>
+                            <div className="md:col-span-2">
+                              <label className="text-sm font-medium text-slate-600">Products/Services Description</label>
+                              <p className="text-sm">{selectedVendor.products_services_description || selectedVendor.business_description || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Contract Effective Date</label>
+                              <p className="text-sm">{selectedVendor.contract_effective_date || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Contract Expiration Date</label>
+                              <p className="text-sm">{selectedVendor.contract_expiration_date || 'N/A'}</p>
+                            </div>
+                          </CardContent>
+                        </Card>
 
-                    {/* III. Procurement & Relationship Information */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>III. Procurement & Relationship Information</CardTitle>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Relationship Owner</label>
-                          <p className="text-sm">{selectedVendor.relationship_owner || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Reconciliation Account</label>
-                          <p className="text-sm">{selectedVendor.reconciliation_account || 'N/A'}</p>
-                        </div>
-                        <div className="md:col-span-2">
-                          <label className="text-sm font-medium text-slate-600">Products/Services Description</label>
-                          <p className="text-sm">{selectedVendor.products_services_description || selectedVendor.business_description || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Contract Effective Date</label>
-                          <p className="text-sm">{selectedVendor.contract_effective_date || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Contract Expiration Date</label>
-                          <p className="text-sm">{selectedVendor.contract_expiration_date || 'N/A'}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        {/* IV. Regulatory & Compliance Information */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>IV. Regulatory & Compliance Information</CardTitle>
+                          </CardHeader>
+                          <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">W-9 Status</label>
+                              <p className="text-sm">{selectedVendor.w9_status || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">W8-BEN Status</label>
+                              <p className="text-sm">{selectedVendor.w8_ben_status || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">W8-BEN-E Status</label>
+                              <p className="text-sm">{selectedVendor.w8_ben_e_status || 'N/A'}</p>
+                            </div>
+                          </CardContent>
+                        </Card>
 
-                    {/* IV. Regulatory & Compliance Information */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>IV. Regulatory & Compliance Information</CardTitle>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">W-9 Status</label>
-                          <p className="text-sm">{selectedVendor.w9_status || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">W8-BEN Status</label>
-                          <p className="text-sm">{selectedVendor.w8_ben_status || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">W8-BEN-E Status</label>
-                          <p className="text-sm">{selectedVendor.w8_ben_e_status || 'N/A'}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
+                        {/* Additional Business Information */}
+                        <Card>
+                          <CardHeader>
+                            <CardTitle>Additional Business Information</CardTitle>
+                          </CardHeader>
+                          <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Year Established</label>
+                              <p className="text-sm">{selectedVendor.year_established || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Employee Count</label>
+                              <p className="text-sm">{selectedVendor.employee_count || 'N/A'}</p>
+                            </div>
+                            <div>
+                              <label className="text-sm font-medium text-slate-600">Annual Revenue</label>
+                              <p className="text-sm">{selectedVendor.annual_revenue || 'N/A'}</p>
+                            </div>
+                             <div>
+                              <label className="text-sm font-medium text-slate-600">Registration Status</label>
+                              <p className="text-sm">{selectedVendor.registration_status}</p>
+                            </div>
+                          </CardContent>
+                        </Card>
 
-                    {/* Additional Business Information */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Additional Business Information</CardTitle>
-                      </CardHeader>
-                      <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Year Established</label>
-                          <p className="text-sm">{selectedVendor.year_established || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Employee Count</label>
-                          <p className="text-sm">{selectedVendor.employee_count || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Annual Revenue</label>
-                          <p className="text-sm">{selectedVendor.annual_revenue || 'N/A'}</p>
-                        </div>
-                        <div>
-                          <label className="text-sm font-medium text-slate-600">Registration Status</label>
-                          <p className="text-sm">{selectedVendor.registration_status}</p>
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    {selectedVendor.registration_status === 'pending' && (
-                      <div className="flex space-x-4">
-                        <Button 
-                          onClick={() => handleVendorStatusChange(selectedVendor.vendor_id, 'approved')}
-                          className="flex-1"
-                        >
-                          <CheckCircle className="h-4 w-4 mr-2" />
-                          Approve Vendor
-                        </Button>
-                        <Button 
-                          variant="destructive"
-                          onClick={() => handleVendorStatusChange(selectedVendor.vendor_id, 'rejected')}
-                          className="flex-1"
-                        >
-                          <XCircle className="h-4 w-4 mr-2" />
-                          Reject Vendor
-                        </Button>
+                        {selectedVendor.registration_status === 'pending' && (
+                          <div className="flex space-x-4">
+                            <Button 
+                              onClick={() => handleVendorStatusChange(selectedVendor.vendor_id, 'approved')}
+                              className="flex-1"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Approve Vendor
+                            </Button>
+                            <Button 
+                              variant="destructive"
+                              onClick={() => handleVendorStatusChange(selectedVendor.vendor_id, 'rejected')}
+                              className="flex-1"
+                            >
+                              <XCircle className="h-4 w-4 mr-2" />
+                              Reject Vendor
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className="text-center py-12">
+                        <p className="text-slate-600">Select a vendor from the list to view details</p>
                       </div>
                     )}
-                  </div>
-                ) : (
-                  <div className="text-center py-12">
-                    <p className="text-slate-600">Select a vendor from the list to view details</p>
-                  </div>
-                )}
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Role-Based Access Tab */}
+          <TabsContent value="role-access">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <UserCheck className="h-5 w-5" />
+                  Role-Based Access Control
+                </CardTitle>
+                <CardDescription>Manage user roles and permissions</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <UserCheck className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">Role Management</h3>
+                  <p className="text-slate-600">Configure user roles and access permissions</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Compliance Tracking Tab */}
+          <TabsContent value="compliance">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Compliance Tracking
+                </CardTitle>
+                <CardDescription>Monitor vendor compliance and certifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <AlertTriangle className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">Compliance Monitoring</h3>
+                  <p className="text-slate-600">Track vendor compliance status and certification requirements</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Document Management Tab */}
+          <TabsContent value="documents">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Archive className="h-5 w-5" />
+                  Document Management
+                </CardTitle>
+                <CardDescription>Manage vendor documents and files</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Archive className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">Document Repository</h3>
+                  <p className="text-slate-600">Store and manage vendor documents and contracts</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Analytics & Reporting Tab */}
+          <TabsContent value="analytics">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Analytics & Reporting
+                </CardTitle>
+                <CardDescription>View analytics and generate reports</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <BarChart3 className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">Reports & Analytics</h3>
+                  <p className="text-slate-600">Generate comprehensive reports and analytics</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Audit & Notifications Tab */}
+          <TabsContent value="audit">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Bell className="h-5 w-5" />
+                  Audit & Notifications
+                </CardTitle>
+                <CardDescription>Monitor system activities and manage notifications</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Bell className="h-12 w-12 text-slate-400 mx-auto mb-4" />
+                  <h3 className="text-lg font-semibold text-slate-700 mb-2">Audit Trail & Alerts</h3>
+                  <p className="text-slate-600">Track system activities and manage notification settings</p>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
