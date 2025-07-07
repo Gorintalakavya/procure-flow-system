@@ -39,6 +39,12 @@ const VendorRegistration = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
+  const generateUniqueVendorId = () => {
+    const timestamp = Date.now().toString();
+    const randomString = Math.random().toString(36).substring(2, 8).toUpperCase();
+    return `VND-${timestamp.slice(-8)}-${randomString}`;
+  };
+
   const sendConfirmationEmail = async (email: string, vendorId: string) => {
     try {
       const { error } = await supabase.functions.invoke('send-confirmation-email', {
@@ -52,13 +58,13 @@ const VendorRegistration = () => {
 
       if (error) {
         console.error('Error sending confirmation email:', error);
-        toast.error('Failed to send confirmation email, but registration was successful');
+        toast.error('Registration successful but failed to send confirmation email');
       } else {
         toast.success('Registration successful! Confirmation email sent.');
       }
     } catch (error) {
       console.error('Error invoking email function:', error);
-      toast.error('Failed to send confirmation email, but registration was successful');
+      toast.error('Registration successful but failed to send confirmation email');
     }
   };
 
@@ -76,10 +82,10 @@ const VendorRegistration = () => {
     setIsSubmitting(true);
 
     try {
-      // Generate unique vendor ID using timestamp and random number
-      const timestamp = Date.now().toString();
-      const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
-      const vendorId = `VND-${timestamp.slice(-6)}-${randomNum}`;
+      // Generate unique vendor ID
+      const vendorId = generateUniqueVendorId();
+
+      console.log('Creating vendor with ID:', vendorId);
 
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
@@ -110,10 +116,13 @@ const VendorRegistration = () => {
 
       if (vendorError) {
         console.error('Error creating vendor:', vendorError);
-        toast.error('Failed to register vendor');
+        toast.error('Failed to register vendor: ' + vendorError.message);
         return;
       }
 
+      console.log('Vendor created successfully:', vendorData);
+
+      // Create audit log
       await supabase
         .from('audit_logs')
         .insert({
@@ -126,14 +135,18 @@ const VendorRegistration = () => {
           user_agent: navigator.userAgent
         });
 
+      // Send confirmation email
       await sendConfirmationEmail(formData.email, vendorId);
       
+      // Store vendor info for the auth page
       localStorage.setItem('pendingVendor', JSON.stringify({
         vendorId: vendorId,
         email: formData.email,
-        contactName: formData.contactName
+        contactName: formData.contactName,
+        legalEntityName: formData.legalEntityName
       }));
 
+      // Navigate to auth page
       navigate('/vendor-auth');
 
     } catch (error) {

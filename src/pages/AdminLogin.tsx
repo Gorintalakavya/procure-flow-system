@@ -24,6 +24,12 @@ const AdminLogin = () => {
     confirmPassword: ''
   });
 
+  const generateUniqueAdminId = () => {
+    const timestamp = Date.now().toString();
+    const randomString = Math.random().toString(36).substring(2, 6).toUpperCase();
+    return `ADM-${timestamp.slice(-6)}-${randomString}`;
+  };
+
   const sendAdminConfirmationEmail = async (email: string, action: string) => {
     try {
       const { error } = await supabase.functions.invoke('send-confirmation-email', {
@@ -37,13 +43,11 @@ const AdminLogin = () => {
 
       if (error) {
         console.error('Error sending admin confirmation email:', error);
-        toast.error('Failed to send confirmation email, but action was successful');
       } else {
-        toast.success('Confirmation email sent successfully!');
+        console.log('Admin confirmation email sent successfully');
       }
     } catch (error) {
       console.error('Error invoking admin email function:', error);
-      toast.error('Failed to send confirmation email, but action was successful');
     }
   };
 
@@ -65,11 +69,19 @@ const AdminLogin = () => {
         return;
       }
 
+      // Get admin profile to find admin_id
+      const { data: adminProfile } = await supabase
+        .from('admin_profiles')
+        .select('admin_id')
+        .eq('admin_user_id', adminData.id)
+        .single();
+
       localStorage.setItem('adminUser', JSON.stringify({
         id: adminData.id,
         email: adminData.email,
         name: adminData.name,
         role: adminData.role,
+        adminId: adminProfile?.admin_id || '',
         isAuthenticated: true
       }));
 
@@ -128,11 +140,26 @@ const AdminLogin = () => {
         throw createError;
       }
 
+      // Generate unique admin ID and create admin profile
+      const adminId = generateUniqueAdminId();
+      
+      const { error: profileError } = await supabase
+        .from('admin_profiles')
+        .insert({
+          admin_id: adminId,
+          admin_user_id: newAdmin.id
+        });
+
+      if (profileError) {
+        console.error('Error creating admin profile:', profileError);
+      }
+
       localStorage.setItem('adminUser', JSON.stringify({
         id: newAdmin.id,
         email: newAdmin.email,
         name: newAdmin.name,
         role: newAdmin.role,
+        adminId: adminId,
         isAuthenticated: true
       }));
 

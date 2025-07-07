@@ -33,7 +33,8 @@ const VendorAuth = () => {
       setPendingVendor(vendor);
       setSignupData(prev => ({
         ...prev,
-        vendorId: vendor.vendorId
+        vendorId: vendor.vendorId,
+        email: vendor.email
       }));
     }
   }, []);
@@ -51,13 +52,11 @@ const VendorAuth = () => {
 
       if (error) {
         console.error('Error sending confirmation email:', error);
-        toast.error('Failed to send confirmation email, but account was created successfully');
       } else {
-        toast.success('Confirmation email sent successfully!');
+        console.log('Confirmation email sent successfully');
       }
     } catch (error) {
       console.error('Error invoking email function:', error);
-      toast.error('Failed to send confirmation email, but account was created successfully');
     }
   };
 
@@ -113,6 +112,11 @@ const VendorAuth = () => {
 
     if (!signupData.vendorId) {
       toast.error('Vendor ID is required. Please complete registration first.');
+      return;
+    }
+
+    if (!signupData.email) {
+      toast.error('Email is required');
       return;
     }
 
@@ -202,7 +206,16 @@ const VendorAuth = () => {
         <div className="text-center mb-8">
           <Building2 className="h-12 w-12 text-blue-600 mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-slate-900">Vendor Portal</h1>
-          <p className="text-slate-600 mt-2">Access your vendor account</p>
+          <p className="text-slate-600 mt-2">Create your vendor account</p>
+          {pendingVendor && (
+            <div className="mt-4 p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-blue-800">
+                <strong>Registration Complete!</strong><br />
+                Vendor ID: {pendingVendor.vendorId}<br />
+                Create your login credentials below.
+              </p>
+            </div>
+          )}
         </div>
 
         <Card>
@@ -213,56 +226,12 @@ const VendorAuth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
+            <Tabs defaultValue="signup" className="w-full">
               <TabsList className="grid w-full grid-cols-3">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Create Account</TabsTrigger>
+                <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="forgot">Forgot Password</TabsTrigger>
               </TabsList>
-
-              <TabsContent value="signin">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div>
-                    <Label htmlFor="signin-email">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signin-email"
-                        type="email"
-                        value={loginData.email}
-                        onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="Enter your email"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="signin-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="signin-password"
-                        type="password"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                        placeholder="Enter your password"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Signing In...' : 'Sign In'}
-                  </Button>
-                </form>
-              </TabsContent>
 
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
@@ -278,6 +247,7 @@ const VendorAuth = () => {
                         placeholder="Enter your vendor ID"
                         className="pl-10"
                         required
+                        readOnly={!!pendingVendor}
                       />
                     </div>
                   </div>
@@ -294,6 +264,7 @@ const VendorAuth = () => {
                         placeholder="Enter your email address"
                         className="pl-10"
                         required
+                        readOnly={!!pendingVendor}
                       />
                     </div>
                   </div>
@@ -338,6 +309,50 @@ const VendorAuth = () => {
                     disabled={isLoading}
                   >
                     {isLoading ? 'Creating Account...' : 'Create Account'}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="signin">
+                <form onSubmit={handleSignIn} className="space-y-4">
+                  <div>
+                    <Label htmlFor="signin-email">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signin-email"
+                        type="email"
+                        value={loginData.email}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="Enter your email"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="signin-password">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="signin-password"
+                        type="password"
+                        value={loginData.password}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                        placeholder="Enter your password"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Signing In...' : 'Sign In'}
                   </Button>
                 </form>
               </TabsContent>

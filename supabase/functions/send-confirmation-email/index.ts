@@ -105,6 +105,7 @@ const handler = async (req: Request): Promise<Response> => {
           <p>You have successfully logged into your vendor portal account.</p>
           <p><strong>Vendor ID:</strong> ${vendorId}</p>
           <p><strong>Login Time:</strong> ${new Date().toLocaleString()}</p>
+          <p><strong>Email:</strong> ${email}</p>
           <p>If this wasn't you, please contact our support team immediately.</p>
           <p>Best regards,<br>Vendor Management Team</p>
         `;
@@ -139,14 +140,18 @@ const handler = async (req: Request): Promise<Response> => {
     const emailContent = {
       to: email,
       subject: subject,
-      html: htmlContent
+      html: htmlContent,
+      timestamp: new Date().toISOString(),
+      section: section,
+      action: action,
+      vendorId: vendorId
     };
 
     console.log('Email would be sent with content:', emailContent);
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Confirmation email logged successfully',
+      message: 'Confirmation email processed successfully',
       emailContent,
       timestamp: new Date().toISOString()
     }), {
@@ -160,7 +165,10 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error) {
     console.error('Error in send-confirmation-email function:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        timestamp: new Date().toISOString()
+      }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
