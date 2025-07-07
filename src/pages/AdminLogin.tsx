@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -30,21 +29,23 @@ const AdminLogin = () => {
     return `ADM-${timestamp.slice(-6)}-${randomString}`;
   };
 
-  const sendAdminConfirmationEmail = async (email: string, action: string) => {
+  const sendAdminConfirmationEmail = async (email: string, action: string, adminId?: string) => {
     try {
-      const { error } = await supabase.functions.invoke('send-confirmation-email', {
+      console.log('Sending admin confirmation email to:', email);
+      const response = await supabase.functions.invoke('send-confirmation-email', {
         body: {
           email,
-          vendorId: '', // No vendor ID for admin
+          vendorId: adminId || '', // Use admin ID instead of vendor ID
           section: 'admin',
           action
         }
       });
 
-      if (error) {
-        console.error('Error sending admin confirmation email:', error);
+      if (response.error) {
+        console.error('Error sending admin confirmation email:', response.error);
       } else {
         console.log('Admin confirmation email sent successfully');
+        toast.success('Confirmation email sent successfully!');
       }
     } catch (error) {
       console.error('Error invoking admin email function:', error);
@@ -58,7 +59,10 @@ const AdminLogin = () => {
     try {
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
-        .select('*')
+        .select(`
+          *,
+          admin_profiles(admin_id)
+        `)
         .eq('email', loginData.email)
         .eq('password_hash', loginData.password)
         .eq('is_active', true)
@@ -69,23 +73,18 @@ const AdminLogin = () => {
         return;
       }
 
-      // Get admin profile to find admin_id
-      const { data: adminProfile } = await supabase
-        .from('admin_profiles')
-        .select('admin_id')
-        .eq('admin_user_id', adminData.id)
-        .single();
+      const adminId = adminData.admin_profiles?.[0]?.admin_id || '';
 
       localStorage.setItem('adminUser', JSON.stringify({
         id: adminData.id,
         email: adminData.email,
         name: adminData.name,
         role: adminData.role,
-        adminId: adminProfile?.admin_id || '',
+        adminId: adminId,
         isAuthenticated: true
       }));
 
-      await sendAdminConfirmationEmail(adminData.email, 'signin');
+      await sendAdminConfirmationEmail(adminData.email, 'signin', adminId);
       toast.success('Admin login successful!');
       navigate('/admin-dashboard');
 
@@ -163,7 +162,7 @@ const AdminLogin = () => {
         isAuthenticated: true
       }));
 
-      await sendAdminConfirmationEmail(newAdmin.email, 'signup');
+      await sendAdminConfirmationEmail(newAdmin.email, 'signup', adminId);
       toast.success('Admin account created successfully!');
       navigate('/admin-dashboard');
 

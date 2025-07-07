@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +15,7 @@ const AdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('vendor-management');
   const [vendors, setVendors] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
+  const [adminUsers, setAdminUsers] = useState<any[]>([]);
   const [compliance, setCompliance] = useState<any[]>([]);
   const [documents, setDocuments] = useState<any[]>([]);
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -37,12 +37,35 @@ const AdminDashboard = () => {
         .order('created_at', { ascending: false });
       setVendors(vendorsData || []);
 
-      // Fetch users
+      // Fetch vendor users (users with vendor_id)
       const { data: usersData } = await supabase
         .from('user_roles')
         .select('*')
+        .not('vendor_id', 'is', null)
         .order('created_at', { ascending: false });
       setUsers(usersData || []);
+
+      // Fetch admin users with their admin IDs
+      const { data: adminData } = await supabase
+        .from('admin_users')
+        .select(`
+          *,
+          admin_profiles(admin_id)
+        `)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      
+      const formattedAdminData = adminData?.map(admin => ({
+        id: admin.id,
+        user_email: admin.email,
+        role: 'admin',
+        admin_id: admin.admin_profiles?.[0]?.admin_id || 'N/A',
+        access_level: 'Full Access',
+        department: 'Administration',
+        created_at: admin.created_at
+      })) || [];
+      
+      setAdminUsers(formattedAdminData);
 
       // Fetch compliance data
       const { data: complianceData } = await supabase
@@ -367,28 +390,61 @@ const AdminDashboard = () => {
                 <CardDescription>Manage user roles and permissions</CardDescription>
               </CardHeader>
               <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User Email</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Vendor ID</TableHead>
-                      <TableHead>Access Level</TableHead>
-                      <TableHead>Department</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {users.map((user) => (
-                      <TableRow key={user.id}>
-                        <TableCell>{user.user_email}</TableCell>
-                        <TableCell className="capitalize">{user.role}</TableCell>
-                        <TableCell>{user.vendor_id || 'N/A'}</TableCell>
-                        <TableCell>{user.access_level || 'Standard'}</TableCell>
-                        <TableCell>{user.department || 'N/A'}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                <div className="space-y-6">
+                  {/* Admin Users Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Admin Users</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Admin ID</TableHead>
+                          <TableHead>Access Level</TableHead>
+                          <TableHead>Department</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {adminUsers.map((admin) => (
+                          <TableRow key={admin.id}>
+                            <TableCell>{admin.user_email}</TableCell>
+                            <TableCell className="capitalize">{admin.role}</TableCell>
+                            <TableCell className="font-medium">{admin.admin_id}</TableCell>
+                            <TableCell>{admin.access_level}</TableCell>
+                            <TableCell>{admin.department}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {/* Vendor Users Section */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Vendor Users</h3>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User Email</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Vendor ID</TableHead>
+                          <TableHead>Access Level</TableHead>
+                          <TableHead>Department</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {users.map((user) => (
+                          <TableRow key={user.id}>
+                            <TableCell>{user.user_email}</TableCell>
+                            <TableCell className="capitalize">{user.role}</TableCell>
+                            <TableCell className="font-medium">{user.vendor_id}</TableCell>
+                            <TableCell>{user.access_level || 'Standard'}</TableCell>
+                            <TableCell>{user.department || 'N/A'}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>
