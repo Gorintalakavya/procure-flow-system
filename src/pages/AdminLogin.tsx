@@ -18,23 +18,45 @@ const AdminLogin = () => {
     password: ''
   });
   const [signupData, setSignupData] = useState({
+    name: '',
     email: '',
     password: '',
-    confirmPassword: '',
-    name: ''
+    confirmPassword: ''
   });
+
+  const sendAdminConfirmationEmail = async (email: string, action: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          email,
+          vendorId: '', // No vendor ID for admin
+          section: 'admin',
+          action
+        }
+      });
+
+      if (error) {
+        console.error('Error sending admin confirmation email:', error);
+        toast.error('Failed to send confirmation email, but action was successful');
+      } else {
+        toast.success('Confirmation email sent successfully!');
+      }
+    } catch (error) {
+      console.error('Error invoking admin email function:', error);
+      toast.error('Failed to send confirmation email, but action was successful');
+    }
+  };
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      // First check if admin user exists in admin_users table
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select('*')
         .eq('email', loginData.email)
-        .eq('password_hash', loginData.password) // In production, use proper hashing
+        .eq('password_hash', loginData.password)
         .eq('is_active', true)
         .single();
 
@@ -43,7 +65,6 @@ const AdminLogin = () => {
         return;
       }
 
-      // Store admin session
       localStorage.setItem('adminUser', JSON.stringify({
         id: adminData.id,
         email: adminData.email,
@@ -52,10 +73,8 @@ const AdminLogin = () => {
         isAuthenticated: true
       }));
 
-      // Send confirmation email
-      await sendConfirmationEmail(adminData.email, adminData.id, 'admin', 'signin');
-
-      toast.success('Admin login successful! Confirmation email sent.');
+      await sendAdminConfirmationEmail(adminData.email, 'signin');
+      toast.success('Admin login successful!');
       navigate('/admin-dashboard');
 
     } catch (error) {
@@ -82,7 +101,6 @@ const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      // Check if admin user already exists
       const { data: existingAdmin } = await supabase
         .from('admin_users')
         .select('email')
@@ -90,17 +108,16 @@ const AdminLogin = () => {
         .single();
 
       if (existingAdmin) {
-        toast.error('Admin user with this email already exists');
+        toast.error('Admin with this email already exists');
         return;
       }
 
-      // Create new admin user
       const { data: newAdmin, error: createError } = await supabase
         .from('admin_users')
         .insert({
-          email: signupData.email,
-          password_hash: signupData.password, // In production, use proper hashing
           name: signupData.name,
+          email: signupData.email,
+          password_hash: signupData.password,
           role: 'admin',
           is_active: true
         })
@@ -111,50 +128,29 @@ const AdminLogin = () => {
         throw createError;
       }
 
-      // Send confirmation email
-      await sendConfirmationEmail(newAdmin.email, newAdmin.id, 'admin', 'signup');
+      localStorage.setItem('adminUser', JSON.stringify({
+        id: newAdmin.id,
+        email: newAdmin.email,
+        name: newAdmin.name,
+        role: newAdmin.role,
+        isAuthenticated: true
+      }));
 
-      toast.success('Admin account created successfully! Confirmation email sent.');
-      
-      // Clear form
-      setSignupData({
-        email: '',
-        password: '',
-        confirmPassword: '',
-        name: ''
-      });
+      await sendAdminConfirmationEmail(newAdmin.email, 'signup');
+      toast.success('Admin account created successfully!');
+      navigate('/admin-dashboard');
 
     } catch (error) {
-      console.error('Admin signup error:', error);
+      console.error('Error creating admin:', error);
       toast.error('An unexpected error occurred during signup');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const sendConfirmationEmail = async (email: string, adminId: string, section: string, action: string) => {
-    try {
-      const { error } = await supabase.functions.invoke('send-confirmation-email', {
-        body: {
-          email,
-          vendorId: adminId,
-          section,
-          action
-        }
-      });
-
-      if (error) {
-        console.error('Error sending confirmation email:', error);
-      }
-    } catch (error) {
-      console.error('Error invoking email function:', error);
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 flex items-center justify-center">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center">
       <div className="max-w-md w-full mx-4">
-        {/* Back Button */}
         <div className="mb-6">
           <Button
             variant="ghost"
@@ -166,18 +162,17 @@ const AdminLogin = () => {
           </Button>
         </div>
 
-        {/* Header */}
         <div className="text-center mb-8">
-          <Shield className="h-12 w-12 text-slate-600 mx-auto mb-4" />
+          <Shield className="h-12 w-12 text-red-600 mx-auto mb-4" />
           <h1 className="text-3xl font-bold text-slate-900">Admin Portal</h1>
-          <p className="text-slate-600 mt-2">Administrative access required</p>
+          <p className="text-slate-600 mt-2">Administrative access</p>
         </div>
 
         <Card>
           <CardHeader>
             <CardTitle className="text-center">Admin Authentication</CardTitle>
             <CardDescription className="text-center">
-              Sign in to existing account or create new admin account
+              Sign in to your admin account or create a new one
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -190,15 +185,15 @@ const AdminLogin = () => {
               <TabsContent value="signin">
                 <form onSubmit={handleSignIn} className="space-y-4">
                   <div>
-                    <Label htmlFor="signin-email">Email Address</Label>
+                    <Label htmlFor="admin-signin-email">Email Address</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="signin-email"
+                        id="admin-signin-email"
                         type="email"
                         value={loginData.email}
                         onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="Enter admin email"
+                        placeholder="Enter your admin email"
                         className="pl-10"
                         required
                       />
@@ -206,15 +201,15 @@ const AdminLogin = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="signin-password">Password</Label>
+                    <Label htmlFor="admin-signin-password">Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="signin-password"
+                        id="admin-signin-password"
                         type="password"
                         value={loginData.password}
                         onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                        placeholder="Enter admin password"
+                        placeholder="Enter your password"
                         className="pl-10"
                         required
                       />
@@ -226,7 +221,7 @@ const AdminLogin = () => {
                     className="w-full"
                     disabled={isLoading}
                   >
-                    {isLoading ? 'Signing In...' : 'Sign In as Admin'}
+                    {isLoading ? 'Signing In...' : 'Sign In'}
                   </Button>
                 </form>
               </TabsContent>
@@ -234,15 +229,15 @@ const AdminLogin = () => {
               <TabsContent value="signup">
                 <form onSubmit={handleSignUp} className="space-y-4">
                   <div>
-                    <Label htmlFor="signup-name">Full Name</Label>
+                    <Label htmlFor="admin-signup-name">Full Name</Label>
                     <div className="relative">
                       <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="signup-name"
+                        id="admin-signup-name"
                         type="text"
                         value={signupData.name}
                         onChange={(e) => setSignupData(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="Enter full name"
+                        placeholder="Enter your full name"
                         className="pl-10"
                         required
                       />
@@ -250,15 +245,15 @@ const AdminLogin = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="signup-email">Email Address</Label>
+                    <Label htmlFor="admin-signup-email">Email Address</Label>
                     <div className="relative">
                       <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="signup-email"
+                        id="admin-signup-email"
                         type="email"
                         value={signupData.email}
                         onChange={(e) => setSignupData(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="Enter admin email"
+                        placeholder="Enter your email address"
                         className="pl-10"
                         required
                       />
@@ -266,15 +261,15 @@ const AdminLogin = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="signup-password">Password</Label>
+                    <Label htmlFor="admin-signup-password">Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="signup-password"
+                        id="admin-signup-password"
                         type="password"
                         value={signupData.password}
                         onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
-                        placeholder="Enter password (min 6 characters)"
+                        placeholder="Create a password (min 6 characters)"
                         className="pl-10"
                         required
                         minLength={6}
@@ -283,15 +278,15 @@ const AdminLogin = () => {
                   </div>
 
                   <div>
-                    <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                    <Label htmlFor="admin-signup-confirm-password">Confirm Password</Label>
                     <div className="relative">
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
-                        id="signup-confirm-password"
+                        id="admin-signup-confirm-password"
                         type="password"
                         value={signupData.confirmPassword}
                         onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                        placeholder="Confirm password"
+                        placeholder="Confirm your password"
                         className="pl-10"
                         required
                         minLength={6}

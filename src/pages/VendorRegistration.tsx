@@ -6,8 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, CheckCircle } from "lucide-react";
+import { Building2, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,10 +14,7 @@ import { supabase } from "@/integrations/supabase/client";
 const VendorRegistration = () => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [currentTab, setCurrentTab] = useState('general');
-  const [completedTabs, setCompletedTabs] = useState<string[]>([]);
   const [formData, setFormData] = useState({
-    // General Information
     legalEntityName: '',
     tradeName: '',
     vendorType: '',
@@ -36,65 +32,39 @@ const VendorRegistration = () => {
     website: '',
     yearEstablished: '',
     employeeCount: '',
-    annualRevenue: '',
-    taxId: '',
-    vatId: '',
-    paymentTerms: '',
-    bankAccountDetails: '',
-    currency: 'USD',
-    relationshipOwner: '',
-    productsServicesDescription: '',
-    contractEffectiveDate: '',
-    contractExpirationDate: '',
-    reconciliationAccount: '',
-    w9Status: '',
-    w8BenStatus: '',
-    w8BenEStatus: ''
+    annualRevenue: ''
   });
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const validateCurrentTab = (tab: string) => {
-    switch (tab) {
-      case 'general':
-        return formData.legalEntityName && formData.vendorType && formData.streetAddress && 
-               formData.city && formData.state && formData.postalCode && formData.country && 
-               formData.contactName && formData.email;
-      case 'financial':
-        return true; // Financial fields are optional
-      case 'procurement':
-        return true; // Procurement fields are optional
-      case 'compliance':
-        return true; // Compliance fields are optional
-      default:
-        return false;
-    }
-  };
+  const sendConfirmationEmail = async (email: string, vendorId: string) => {
+    try {
+      const { error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          email,
+          vendorId,
+          section: 'vendor',
+          action: 'registration'
+        }
+      });
 
-  const handleTabChange = (newTab: string) => {
-    if (validateCurrentTab(currentTab)) {
-      if (!completedTabs.includes(currentTab)) {
-        setCompletedTabs(prev => [...prev, currentTab]);
+      if (error) {
+        console.error('Error sending confirmation email:', error);
+        toast.error('Failed to send confirmation email, but registration was successful');
+      } else {
+        toast.success('Registration successful! Confirmation email sent.');
       }
+    } catch (error) {
+      console.error('Error invoking email function:', error);
+      toast.error('Failed to send confirmation email, but registration was successful');
     }
-    setCurrentTab(newTab);
-  };
-
-  const canProceedToSubmit = () => {
-    const allTabs = ['general', 'financial', 'procurement', 'compliance'];
-    return allTabs.every(tab => completedTabs.includes(tab) || tab === currentTab && validateCurrentTab(tab));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!canProceedToSubmit()) {
-      toast.error('Please complete all required sections');
-      return;
-    }
-
     const requiredFields = ['legalEntityName', 'vendorType', 'streetAddress', 'city', 'state', 'postalCode', 'country', 'contactName', 'email'];
     const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
     
@@ -106,17 +76,10 @@ const VendorRegistration = () => {
     setIsSubmitting(true);
 
     try {
-      // Generate vendor ID using the database function
-      const { data: vendorIdData, error: vendorIdError } = await supabase
-        .rpc('generate_vendor_id');
-
-      if (vendorIdError) {
-        console.error('Error generating vendor ID:', vendorIdError);
-        toast.error('Failed to generate vendor ID');
-        return;
-      }
-
-      const vendorId = vendorIdData;
+      // Generate unique vendor ID using timestamp and random number
+      const timestamp = Date.now().toString();
+      const randomNum = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      const vendorId = `VND-${timestamp.slice(-6)}-${randomNum}`;
 
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
@@ -140,19 +103,6 @@ const VendorRegistration = () => {
           year_established: formData.yearEstablished || null,
           employee_count: formData.employeeCount || null,
           annual_revenue: formData.annualRevenue || null,
-          tax_id: formData.taxId || null,
-          vat_id: formData.vatId || null,
-          payment_terms: formData.paymentTerms || null,
-          bank_account_details: formData.bankAccountDetails || null,
-          currency: formData.currency,
-          relationship_owner: formData.relationshipOwner || null,
-          products_services_description: formData.productsServicesDescription || formData.businessDescription || null,
-          contract_effective_date: formData.contractEffectiveDate || null,
-          contract_expiration_date: formData.contractExpirationDate || null,
-          reconciliation_account: formData.reconciliationAccount || null,
-          w9_status: formData.w9Status || null,
-          w8_ben_status: formData.w8BenStatus || null,
-          w8_ben_e_status: formData.w8BenEStatus || null,
           registration_status: 'pending'
         })
         .select()
@@ -176,7 +126,7 @@ const VendorRegistration = () => {
           user_agent: navigator.userAgent
         });
 
-      toast.success(`Vendor registered successfully! Your Vendor ID is: ${vendorId}`);
+      await sendConfirmationEmail(formData.email, vendorId);
       
       localStorage.setItem('pendingVendor', JSON.stringify({
         vendorId: vendorId,
@@ -207,460 +157,258 @@ const VendorRegistration = () => {
               </div>
             </div>
             <Button variant="outline" onClick={() => navigate('/')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Home
             </Button>
           </div>
         </div>
       </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <Card>
           <CardHeader>
-            <CardTitle className="text-2xl">Comprehensive Vendor Registration</CardTitle>
+            <CardTitle className="text-2xl">General Information</CardTitle>
             <CardDescription>
-              Please provide complete information about your business. Fields marked with * are required.
+              Please provide basic information about your business. Fields marked with * are required.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit}>
-              <Tabs value={currentTab} onValueChange={handleTabChange} className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="general" className="flex items-center gap-2">
-                    {completedTabs.includes('general') && <CheckCircle className="h-4 w-4 text-green-500" />}
-                    General Info
-                  </TabsTrigger>
-                  <TabsTrigger value="financial" className="flex items-center gap-2">
-                    {completedTabs.includes('financial') && <CheckCircle className="h-4 w-4 text-green-500" />}
-                    Financial
-                  </TabsTrigger>
-                  <TabsTrigger value="procurement" className="flex items-center gap-2">
-                    {completedTabs.includes('procurement') && <CheckCircle className="h-4 w-4 text-green-500" />}
-                    Procurement
-                  </TabsTrigger>
-                  <TabsTrigger value="compliance" className="flex items-center gap-2">
-                    {completedTabs.includes('compliance') && <CheckCircle className="h-4 w-4 text-green-500" />}
-                    Compliance
-                  </TabsTrigger>
-                </TabsList>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="legalEntityName">Legal Entity Name *</Label>
+                  <Input
+                    id="legalEntityName"
+                    value={formData.legalEntityName}
+                    onChange={(e) => handleInputChange('legalEntityName', e.target.value)}
+                    placeholder="Enter your legal business name"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="tradeName">Trade Name</Label>
+                  <Input
+                    id="tradeName"
+                    value={formData.tradeName}
+                    onChange={(e) => handleInputChange('tradeName', e.target.value)}
+                    placeholder="Enter your trade name (if different)"
+                  />
+                </div>
+              </div>
 
-                {/* General Information Tab */}
-                <TabsContent value="general" className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label htmlFor="legalEntityName">Legal Entity Name *</Label>
-                      <Input
-                        id="legalEntityName"
-                        value={formData.legalEntityName}
-                        onChange={(e) => handleInputChange('legalEntityName', e.target.value)}
-                        placeholder="Enter your legal business name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="tradeName">Trade Name</Label>
-                      <Input
-                        id="tradeName"
-                        value={formData.tradeName}
-                        onChange={(e) => handleInputChange('tradeName', e.target.value)}
-                        placeholder="Enter your trade name (if different)"
-                      />
-                    </div>
-                  </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <Label htmlFor="vendorType">Vendor Type/Category *</Label>
+                  <Select onValueChange={(value) => handleInputChange('vendorType', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select vendor type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manufacturer">Manufacturer</SelectItem>
+                      <SelectItem value="distributor">Distributor</SelectItem>
+                      <SelectItem value="service-provider">Service Provider</SelectItem>
+                      <SelectItem value="consultant">Consultant</SelectItem>
+                      <SelectItem value="contractor">Contractor</SelectItem>
+                      <SelectItem value="supplier">Supplier</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label htmlFor="website">Website</Label>
+                  <Input
+                    id="website"
+                    value={formData.website}
+                    onChange={(e) => handleInputChange('website', e.target.value)}
+                    placeholder="https://www.yourcompany.com"
+                    type="url"
+                  />
+                </div>
+              </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <Label htmlFor="vendorType">Vendor Type/Category *</Label>
-                      <Select onValueChange={(value) => handleInputChange('vendorType', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select vendor type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="manufacturer">Manufacturer</SelectItem>
-                          <SelectItem value="distributor">Distributor</SelectItem>
-                          <SelectItem value="service-provider">Service Provider</SelectItem>
-                          <SelectItem value="consultant">Consultant</SelectItem>
-                          <SelectItem value="contractor">Contractor</SelectItem>
-                          <SelectItem value="supplier">Supplier</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="website">Website</Label>
-                      <Input
-                        id="website"
-                        value={formData.website}
-                        onChange={(e) => handleInputChange('website', e.target.value)}
-                        placeholder="https://www.yourcompany.com"
-                        type="url"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Business Address</h3>
-                    <div>
-                      <Label htmlFor="streetAddress">Street Address *</Label>
-                      <Input
-                        id="streetAddress"
-                        value={formData.streetAddress}
-                        onChange={(e) => handleInputChange('streetAddress', e.target.value)}
-                        placeholder="Enter your street address"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="streetAddressLine2">Street Address Line 2</Label>
-                      <Input
-                        id="streetAddressLine2"
-                        value={formData.streetAddressLine2}
-                        onChange={(e) => handleInputChange('streetAddressLine2', e.target.value)}
-                        placeholder="Apt, suite, etc. (optional)"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor="city">City *</Label>
-                        <Input
-                          id="city"
-                          value={formData.city}
-                          onChange={(e) => handleInputChange('city', e.target.value)}
-                          placeholder="Enter city"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="state">State *</Label>
-                        <Input
-                          id="state"
-                          value={formData.state}
-                          onChange={(e) => handleInputChange('state', e.target.value)}
-                          placeholder="Enter state"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="postalCode">Postal Code *</Label>
-                        <Input
-                          id="postalCode"
-                          value={formData.postalCode}
-                          onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                          placeholder="Enter postal code"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="country">Country *</Label>
-                      <Select onValueChange={(value) => handleInputChange('country', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select country" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="US">United States</SelectItem>
-                          <SelectItem value="CA">Canada</SelectItem>
-                          <SelectItem value="UK">United Kingdom</SelectItem>
-                          <SelectItem value="AU">Australia</SelectItem>
-                          <SelectItem value="IN">India</SelectItem>
-                          <SelectItem value="DE">Germany</SelectItem>
-                          <SelectItem value="FR">France</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Contact Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="contactName">Contact Name *</Label>
-                        <Input
-                          id="contactName"
-                          value={formData.contactName}
-                          onChange={(e) => handleInputChange('contactName', e.target.value)}
-                          placeholder="Enter primary contact name"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="email">Email Address *</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          value={formData.email}
-                          onChange={(e) => handleInputChange('email', e.target.value)}
-                          placeholder="Enter email address"
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="phoneNumber">Phone Number</Label>
-                        <Input
-                          id="phoneNumber"
-                          value={formData.phoneNumber}
-                          onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                          placeholder="Enter phone number"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="contactPhone">Contact Phone</Label>
-                        <Input
-                          id="contactPhone"
-                          value={formData.contactPhone}
-                          onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                          placeholder="Enter contact phone number"
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Business Details</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      <div>
-                        <Label htmlFor="yearEstablished">Year Established</Label>
-                        <Input
-                          id="yearEstablished"
-                          value={formData.yearEstablished}
-                          onChange={(e) => handleInputChange('yearEstablished', e.target.value)}
-                          placeholder="YYYY"
-                          pattern="[0-9]{4}"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="employeeCount">Employee Count</Label>
-                        <Select onValueChange={(value) => handleInputChange('employeeCount', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select range" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="1-10">1-10</SelectItem>
-                            <SelectItem value="11-50">11-50</SelectItem>
-                            <SelectItem value="51-200">51-200</SelectItem>
-                            <SelectItem value="201-1000">201-1000</SelectItem>
-                            <SelectItem value="1000+">1000+</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div>
-                        <Label htmlFor="annualRevenue">Annual Revenue</Label>
-                        <Select onValueChange={(value) => handleInputChange('annualRevenue', value)}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select range" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="under-1m">Under $1M</SelectItem>
-                            <SelectItem value="1m-10m">$1M - $10M</SelectItem>
-                            <SelectItem value="10m-50m">$10M - $50M</SelectItem>
-                            <SelectItem value="50m-100m">$50M - $100M</SelectItem>
-                            <SelectItem value="over-100m">Over $100M</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="businessDescription">Business Description</Label>
-                      <Textarea
-                        id="businessDescription"
-                        value={formData.businessDescription}
-                        onChange={(e) => handleInputChange('businessDescription', e.target.value)}
-                        placeholder="Describe your business, products, and services..."
-                        rows={4}
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="financial" className="space-y-6">
-                  <h3 className="text-lg font-medium">Financial and Tax Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="taxId">Tax ID</Label>
-                      <Input
-                        id="taxId"
-                        value={formData.taxId}
-                        onChange={(e) => handleInputChange('taxId', e.target.value)}
-                        placeholder="Enter tax identification number"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="vatId">VAT ID</Label>
-                      <Input
-                        id="vatId"
-                        value={formData.vatId}
-                        onChange={(e) => handleInputChange('vatId', e.target.value)}
-                        placeholder="Enter VAT identification number"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="paymentTerms">Payment Terms</Label>
-                      <Select onValueChange={(value) => handleInputChange('paymentTerms', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select payment terms" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="net-15">Net 15</SelectItem>
-                          <SelectItem value="net-30">Net 30</SelectItem>
-                          <SelectItem value="net-45">Net 45</SelectItem>
-                          <SelectItem value="net-60">Net 60</SelectItem>
-                          <SelectItem value="net-90">Net 90</SelectItem>
-                          <SelectItem value="due-on-receipt">Due on Receipt</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="currency">Currency</Label>
-                      <Select value={formData.currency} onValueChange={(value) => handleInputChange('currency', value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="USD">USD - US Dollar</SelectItem>
-                          <SelectItem value="EUR">EUR - Euro</SelectItem>
-                          <SelectItem value="GBP">GBP - British Pound</SelectItem>
-                          <SelectItem value="CAD">CAD - Canadian Dollar</SelectItem>
-                          <SelectItem value="AUD">AUD - Australian Dollar</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Business Address</h3>
+                <div>
+                  <Label htmlFor="streetAddress">Street Address *</Label>
+                  <Input
+                    id="streetAddress"
+                    value={formData.streetAddress}
+                    onChange={(e) => handleInputChange('streetAddress', e.target.value)}
+                    placeholder="Enter your street address"
+                    required
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="streetAddressLine2">Street Address Line 2</Label>
+                  <Input
+                    id="streetAddressLine2"
+                    value={formData.streetAddressLine2}
+                    onChange={(e) => handleInputChange('streetAddressLine2', e.target.value)}
+                    placeholder="Apt, suite, etc. (optional)"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="bankAccountDetails">Bank Account Details</Label>
-                    <Textarea
-                      id="bankAccountDetails"
-                      value={formData.bankAccountDetails}
-                      onChange={(e) => handleInputChange('bankAccountDetails', e.target.value)}
-                      placeholder="Enter bank account details for payments..."
-                      rows={3}
+                    <Label htmlFor="city">City *</Label>
+                    <Input
+                      id="city"
+                      value={formData.city}
+                      onChange={(e) => handleInputChange('city', e.target.value)}
+                      placeholder="Enter city"
+                      required
                     />
                   </div>
-                </TabsContent>
-
-                <TabsContent value="procurement" className="space-y-6">
-                  <h3 className="text-lg font-medium">Procurement & Relationship Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="relationshipOwner">Internal Relationship Owner</Label>
-                      <Input
-                        id="relationshipOwner"
-                        value={formData.relationshipOwner}
-                        onChange={(e) => handleInputChange('relationshipOwner', e.target.value)}
-                        placeholder="Person/department managing this vendor"
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="reconciliationAccount">Reconciliation Account (SAP)</Label>
-                      <Input
-                        id="reconciliationAccount"
-                        value={formData.reconciliationAccount}
-                        onChange={(e) => handleInputChange('reconciliationAccount', e.target.value)}
-                        placeholder="SAP reconciliation account"
-                      />
-                    </div>
-                  </div>
-
                   <div>
-                    <Label htmlFor="productsServicesDescription">Description of Products/Services</Label>
-                    <Textarea
-                      id="productsServicesDescription"
-                      value={formData.productsServicesDescription}
-                      onChange={(e) => handleInputChange('productsServicesDescription', e.target.value)}
-                      placeholder="Detailed description of products and services offered..."
-                      rows={4}
+                    <Label htmlFor="state">State *</Label>
+                    <Input
+                      id="state"
+                      value={formData.state}
+                      onChange={(e) => handleInputChange('state', e.target.value)}
+                      placeholder="Enter state"
+                      required
                     />
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label htmlFor="contractEffectiveDate">Contract Effective Date</Label>
-                      <Input
-                        id="contractEffectiveDate"
-                        type="date"
-                        value={formData.contractEffectiveDate}
-                        onChange={(e) => handleInputChange('contractEffectiveDate', e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="contractExpirationDate">Contract Expiration Date</Label>
-                      <Input
-                        id="contractExpirationDate"
-                        type="date"
-                        value={formData.contractExpirationDate}
-                        onChange={(e) => handleInputChange('contractExpirationDate', e.target.value)}
-                      />
-                    </div>
+                  <div>
+                    <Label htmlFor="postalCode">Postal Code *</Label>
+                    <Input
+                      id="postalCode"
+                      value={formData.postalCode}
+                      onChange={(e) => handleInputChange('postalCode', e.target.value)}
+                      placeholder="Enter postal code"
+                      required
+                    />
                   </div>
-                </TabsContent>
+                </div>
+                <div>
+                  <Label htmlFor="country">Country *</Label>
+                  <Select onValueChange={(value) => handleInputChange('country', value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select country" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="US">United States</SelectItem>
+                      <SelectItem value="CA">Canada</SelectItem>
+                      <SelectItem value="UK">United Kingdom</SelectItem>
+                      <SelectItem value="AU">Australia</SelectItem>
+                      <SelectItem value="IN">India</SelectItem>
+                      <SelectItem value="DE">Germany</SelectItem>
+                      <SelectItem value="FR">France</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
 
-                <TabsContent value="compliance" className="space-y-6">
-                  <h3 className="text-lg font-medium">Regulatory & Compliance Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <Label htmlFor="w9Status">W-9 Status</Label>
-                      <Select onValueChange={(value) => handleInputChange('w9Status', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select W-9 status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="not-required">Not Required</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="submitted">Submitted</SelectItem>
-                          <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="expired">Expired</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="w8BenStatus">W8-BEN Status</Label>
-                      <Select onValueChange={(value) => handleInputChange('w8BenStatus', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select W8-BEN status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="not-required">Not Required</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="submitted">Submitted</SelectItem>
-                          <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="expired">Expired</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="w8BenEStatus">W8-BEN-E Status</Label>
-                      <Select onValueChange={(value) => handleInputChange('w8BenEStatus', value)}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select W8-BEN-E status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="not-required">Not Required</SelectItem>
-                          <SelectItem value="pending">Pending</SelectItem>
-                          <SelectItem value="submitted">Submitted</SelectItem>
-                          <SelectItem value="approved">Approved</SelectItem>
-                          <SelectItem value="expired">Expired</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Contact Information</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="contactName">Contact Name *</Label>
+                    <Input
+                      id="contactName"
+                      value={formData.contactName}
+                      onChange={(e) => handleInputChange('contactName', e.target.value)}
+                      placeholder="Enter primary contact name"
+                      required
+                    />
                   </div>
-                </TabsContent>
+                  <div>
+                    <Label htmlFor="email">Email Address *</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      placeholder="Enter email address"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="phoneNumber">Phone Number</Label>
+                    <Input
+                      id="phoneNumber"
+                      value={formData.phoneNumber}
+                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                      placeholder="Enter phone number"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="contactPhone">Contact Phone</Label>
+                    <Input
+                      id="contactPhone"
+                      value={formData.contactPhone}
+                      onChange={(e) => handleInputChange('contactPhone', e.target.value)}
+                      placeholder="Enter contact phone number"
+                    />
+                  </div>
+                </div>
+              </div>
 
-                {/* Register Button - Only show after completing all sections */}
-                {canProceedToSubmit() && (
-                  <div className="flex justify-end pt-6">
-                    <Button 
-                      type="submit" 
-                      className="px-8 py-3 text-lg"
-                      disabled={isSubmitting}
-                    >
-                      {isSubmitting ? 'Processing...' : 'Register Vendor'}
-                    </Button>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Business Details</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="yearEstablished">Year Established</Label>
+                    <Input
+                      id="yearEstablished"
+                      value={formData.yearEstablished}
+                      onChange={(e) => handleInputChange('yearEstablished', e.target.value)}
+                      placeholder="YYYY"
+                      pattern="[0-9]{4}"
+                    />
                   </div>
-                )}
-              </Tabs>
+                  <div>
+                    <Label htmlFor="employeeCount">Employee Count</Label>
+                    <Select onValueChange={(value) => handleInputChange('employeeCount', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="1-10">1-10</SelectItem>
+                        <SelectItem value="11-50">11-50</SelectItem>
+                        <SelectItem value="51-200">51-200</SelectItem>
+                        <SelectItem value="201-1000">201-1000</SelectItem>
+                        <SelectItem value="1000+">1000+</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="annualRevenue">Annual Revenue</Label>
+                    <Select onValueChange={(value) => handleInputChange('annualRevenue', value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select range" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="under-1m">Under $1M</SelectItem>
+                        <SelectItem value="1m-10m">$1M - $10M</SelectItem>
+                        <SelectItem value="10m-50m">$10M - $50M</SelectItem>
+                        <SelectItem value="50m-100m">$50M - $100M</SelectItem>
+                        <SelectItem value="over-100m">Over $100M</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="businessDescription">Business Description</Label>
+                  <Textarea
+                    id="businessDescription"
+                    value={formData.businessDescription}
+                    onChange={(e) => handleInputChange('businessDescription', e.target.value)}
+                    placeholder="Describe your business, products, and services..."
+                    rows={4}
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-6">
+                <Button 
+                  type="submit" 
+                  className="px-8 py-3 text-lg"
+                  disabled={isSubmitting}
+                >
+                  {isSubmitting ? 'Processing...' : 'Submit Registration'}
+                </Button>
+              </div>
             </form>
           </CardContent>
         </Card>

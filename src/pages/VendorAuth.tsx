@@ -24,6 +24,7 @@ const VendorAuth = () => {
     password: '',
     confirmPassword: ''
   });
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
 
   useEffect(() => {
     const stored = localStorage.getItem('pendingVendor');
@@ -32,8 +33,7 @@ const VendorAuth = () => {
       setPendingVendor(vendor);
       setSignupData(prev => ({
         ...prev,
-        vendorId: vendor.vendorId,
-        email: vendor.email
+        vendorId: vendor.vendorId
       }));
     }
   }, []);
@@ -111,6 +111,11 @@ const VendorAuth = () => {
       return;
     }
 
+    if (!signupData.vendorId) {
+      toast.error('Vendor ID is required. Please complete registration first.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -160,6 +165,26 @@ const VendorAuth = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotPasswordEmail) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await sendConfirmationEmail(forgotPasswordEmail, '', 'forgot-password');
+      toast.success('Password reset instructions sent to your email');
+      setForgotPasswordEmail('');
+    } catch (error) {
+      console.error('Forgot password error:', error);
+      toast.error('Failed to send password reset email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
       <div className="max-w-md w-full mx-4">
@@ -189,9 +214,10 @@ const VendorAuth = () => {
           </CardHeader>
           <CardContent>
             <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="signin">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Create Account</TabsTrigger>
+                <TabsTrigger value="forgot">Forgot Password</TabsTrigger>
               </TabsList>
 
               <TabsContent value="signin">
@@ -312,6 +338,34 @@ const VendorAuth = () => {
                     disabled={isLoading}
                   >
                     {isLoading ? 'Creating Account...' : 'Create Account'}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="forgot">
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div>
+                    <Label htmlFor="forgot-email">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="forgot-email"
+                        type="email"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                        placeholder="Enter your email address"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Sending...' : 'Send Reset Instructions'}
                   </Button>
                 </form>
               </TabsContent>
