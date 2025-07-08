@@ -9,6 +9,7 @@ import { Shield, Users, FileText, CheckCircle2, Clock, AlertTriangle, BarChart3,
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import DocumentUpload from "@/components/DocumentUpload";
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
@@ -25,6 +26,9 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     fetchData();
+    // Set up real-time updates
+    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
+    return () => clearInterval(interval);
   }, []);
 
   const calculateVendorStatus = (vendor: any) => {
@@ -32,17 +36,26 @@ const AdminDashboard = () => {
     
     const requiredFields = [
       'legal_entity_name', 'email', 'contact_name', 'street_address', 
-      'city', 'state', 'postal_code', 'country', 'vendor_type'
+      'city', 'state', 'postal_code', 'country', 'vendor_type',
+      'phone_number', 'business_description', 'tax_id'
     ];
     
-    const filledFields = requiredFields.filter(field => vendor[field] && vendor[field].trim() !== '');
+    const filledFields = requiredFields.filter(field => 
+      vendor[field] && vendor[field].toString().trim() !== ''
+    );
     const completionPercentage = (filledFields.length / requiredFields.length) * 100;
     
-    if (completionPercentage === 100) {
+    console.log(`Vendor ${vendor.vendor_id} completion: ${completionPercentage}%`, {
+      filled: filledFields.length,
+      total: requiredFields.length,
+      fields: filledFields
+    });
+    
+    if (completionPercentage >= 90) {
       return vendor.registration_status === 'approved' ? 'approved' : 'pending_approval';
     } else if (completionPercentage >= 70) {
       return 'nearly_complete';
-    } else if (completionPercentage >= 30) {
+    } else if (completionPercentage >= 40) {
       return 'in_progress';
     } else {
       return 'incomplete';
@@ -64,7 +77,7 @@ const AdminDashboard = () => {
       }));
       setVendors(vendorsWithStatus);
 
-      // Fetch vendor users
+      // Fetch ALL vendor users (not limited to 2)
       const { data: usersData } = await supabase
         .from('user_roles')
         .select('*')
@@ -95,36 +108,52 @@ const AdminDashboard = () => {
       
       setAdminUsers(formattedAdminData);
 
-      // Fetch compliance data
+      // Fetch compliance data with real vendor information
       const { data: complianceData } = await supabase
         .from('compliance_tracking')
-        .select('*')
+        .select(`
+          *,
+          vendors!inner(legal_entity_name, email)
+        `)
         .order('created_at', { ascending: false });
       setCompliance(complianceData || []);
 
-      // Fetch documents
+      // Fetch documents with real vendor information
       const { data: documentsData } = await supabase
         .from('documents')
-        .select('*')
+        .select(`
+          *,
+          vendors(legal_entity_name, email)
+        `)
         .order('upload_date', { ascending: false });
       setDocuments(documentsData || []);
 
-      // Fetch notifications
+      // Fetch notifications with actual data
       const { data: notificationsData } = await supabase
         .from('notifications')
         .select('*')
         .order('created_at', { ascending: false });
       setNotifications(notificationsData || []);
 
-      // Fetch audit logs
+      // Fetch audit logs with detailed information
       const { data: auditData } = await supabase
         .from('audit_logs')
         .select('*')
         .order('timestamp', { ascending: false });
       setAuditLogs(auditData || []);
 
+      console.log('✅ Dashboard data refreshed:', {
+        vendors: vendorsWithStatus.length,
+        users: usersData?.length,
+        admins: formattedAdminData.length,
+        compliance: complianceData?.length,
+        documents: documentsData?.length,
+        notifications: notificationsData?.length,
+        audits: auditData?.length
+      });
+
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('❌ Error fetching data:', error);
       toast.error('Failed to load dashboard data');
     } finally {
       setIsLoading(false);
@@ -168,9 +197,9 @@ const AdminDashboard = () => {
         });
 
       toast.success(`Vendor ${action}d successfully`);
-      fetchData();
+      fetchData(); // Refresh data
     } catch (error) {
-      console.error(`Error ${action}ing vendor:`, error);
+      console.error(`❌ Error ${action}ing vendor:`, error);
       toast.error(`Failed to ${action} vendor`);
     } finally {
       setIsLoading(false);
@@ -180,30 +209,34 @@ const AdminDashboard = () => {
   const exportVendorData = () => {
     try {
       const csvContent = [
-        ['Vendor ID', 'Legal Entity Name', 'Email', 'Type', 'Status', 'City', 'State', 'Country', 'Created At'].join(','),
+        ['Vendor ID', 'Legal Entity Name', 'Email', 'Contact Name', 'Type', 'Status', 'Phone', 'City', 'State', 'Country', 'Created At'].join(','),
         ...vendors.map(vendor => [
           vendor.vendor_id,
-          vendor.legal_entity_name,
+          `"${vendor.legal_entity_name}"`,
           vendor.email,
+          `"${vendor.contact_name}"`,
           vendor.vendor_type,
           vendor.calculated_status,
-          vendor.city,
-          vendor.state,
+          vendor.phone_number || 'N/A',
+          `"${vendor.city}"`,
+          `"${vendor.state}"`,
           vendor.country,
           new Date(vendor.created_at).toLocaleDateString()
         ].join(','))
       ].join('\n');
 
-      const blob = new Blob([csvContent], { type: 'text/csv' });
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = `vendor_data_${new Date().toISOString().split('T')[0]}.csv`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
       toast.success('Vendor data exported successfully');
     } catch (error) {
-      console.error('Export error:', error);
+      console.error('❌ Export error:', error);
       toast.error('Failed to export vendor data');
     }
   };
@@ -242,7 +275,7 @@ const AdminDashboard = () => {
     <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
       <DialogHeader>
         <DialogTitle>Vendor Details - {vendor.legal_entity_name}</DialogTitle>
-        <DialogDescription>Complete vendor information</DialogDescription>
+        <DialogDescription>Complete vendor information and status</DialogDescription>
       </DialogHeader>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div>
@@ -255,6 +288,7 @@ const AdminDashboard = () => {
             <p><strong>Email:</strong> {vendor.email}</p>
             <p><strong>Phone:</strong> {vendor.phone_number || 'N/A'}</p>
             <p><strong>Website:</strong> {vendor.website || 'N/A'}</p>
+            <p><strong>Business Description:</strong> {vendor.business_description || 'N/A'}</p>
           </div>
         </div>
         <div>
@@ -275,11 +309,17 @@ const AdminDashboard = () => {
             <p><strong>VAT ID:</strong> {vendor.vat_id || 'N/A'}</p>
             <p><strong>Payment Terms:</strong> {vendor.payment_terms || 'N/A'}</p>
             <p><strong>Currency:</strong> {vendor.currency}</p>
+            <p><strong>Bank Account:</strong> {vendor.bank_account_details || 'N/A'}</p>
           </div>
         </div>
         <div>
-          <h3 className="font-semibold mb-2">Compliance Status</h3>
+          <h3 className="font-semibold mb-2">Status & Compliance</h3>
           <div className="space-y-2 text-sm">
+            <p><strong>Registration Status:</strong> 
+              <Badge className={`ml-2 ${getStatusBadgeColor(vendor.calculated_status)}`}>
+                {getStatusLabel(vendor.calculated_status)}
+              </Badge>
+            </p>
             <p><strong>W-9 Status:</strong> {vendor.w9_status || 'N/A'}</p>
             <p><strong>W8-BEN Status:</strong> {vendor.w8_ben_status || 'N/A'}</p>
             <p><strong>W8-BEN-E Status:</strong> {vendor.w8_ben_e_status || 'N/A'}</p>
@@ -289,7 +329,7 @@ const AdminDashboard = () => {
     </DialogContent>
   );
 
-  if (isLoading) {
+  if (isLoading && vendors.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -325,7 +365,7 @@ const AdminDashboard = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Enhanced Stats Cards */}
+        {/* Real-time Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
           <Card>
             <CardContent className="flex items-center p-6">
@@ -401,7 +441,7 @@ const AdminDashboard = () => {
                       <Building2 className="h-5 w-5" />
                       Vendor Management
                     </CardTitle>
-                    <CardDescription>Review and manage vendor registrations with intelligent status tracking</CardDescription>
+                    <CardDescription>Review and manage vendor registrations with real-time status tracking</CardDescription>
                   </div>
                   <Button onClick={exportVendorData} className="flex items-center gap-2">
                     <Download className="h-4 w-4" />
@@ -425,13 +465,13 @@ const AdminDashboard = () => {
                     </TableHeader>
                     <TableBody>
                       {vendors.map((vendor) => {
-                        const requiredFields = ['legal_entity_name', 'email', 'contact_name', 'street_address', 'city', 'state', 'postal_code', 'country', 'vendor_type'];
-                        const filledFields = requiredFields.filter(field => vendor[field] && vendor[field].trim() !== '');
+                        const requiredFields = ['legal_entity_name', 'email', 'contact_name', 'street_address', 'city', 'state', 'postal_code', 'country', 'vendor_type', 'phone_number', 'business_description', 'tax_id'];
+                        const filledFields = requiredFields.filter(field => vendor[field] && vendor[field].toString().trim() !== '');
                         const completionPercentage = Math.round((filledFields.length / requiredFields.length) * 100);
                         
                         return (
                           <TableRow key={vendor.id}>
-                            <TableCell className="font-medium">{vendor.vendor_id}</TableCell>
+                            <TableCell className="font-medium font-mono">{vendor.vendor_id}</TableCell>
                             <TableCell>{vendor.legal_entity_name}</TableCell>
                             <TableCell>{vendor.email}</TableCell>
                             <TableCell className="capitalize">{vendor.vendor_type}</TableCell>
@@ -444,7 +484,12 @@ const AdminDashboard = () => {
                               <div className="flex items-center gap-2">
                                 <div className="w-16 bg-gray-200 rounded-full h-2">
                                   <div 
-                                    className="bg-blue-600 h-2 rounded-full" 
+                                    className={`h-2 rounded-full ${
+                                      completionPercentage >= 90 ? 'bg-green-600' :
+                                      completionPercentage >= 70 ? 'bg-yellow-600' :
+                                      completionPercentage >= 40 ? 'bg-orange-600' :
+                                      'bg-red-600'
+                                    }`}
                                     style={{ width: `${completionPercentage}%` }}
                                   ></div>
                                 </div>
@@ -525,6 +570,7 @@ const AdminDashboard = () => {
                           <TableHead>Admin ID</TableHead>
                           <TableHead>Access Level</TableHead>
                           <TableHead>Department</TableHead>
+                          <TableHead>Created</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -538,6 +584,7 @@ const AdminDashboard = () => {
                             <TableCell className="font-mono text-sm">{admin.admin_id}</TableCell>
                             <TableCell>{admin.access_level}</TableCell>
                             <TableCell>{admin.department}</TableCell>
+                            <TableCell>{new Date(admin.created_at).toLocaleDateString()}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -555,6 +602,8 @@ const AdminDashboard = () => {
                           <TableHead>Vendor ID</TableHead>
                           <TableHead>Access Level</TableHead>
                           <TableHead>Department</TableHead>
+                          <TableHead>Primary Contact</TableHead>
+                          <TableHead>Created</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -567,12 +616,80 @@ const AdminDashboard = () => {
                             <TableCell className="font-mono text-sm">{user.vendor_id}</TableCell>
                             <TableCell>{user.access_level || 'Standard'}</TableCell>
                             <TableCell>{user.department || 'N/A'}</TableCell>
+                            <TableCell>
+                              {user.is_primary_contact ? 
+                                <Badge className="bg-green-100 text-green-800">Yes</Badge> : 
+                                <Badge className="bg-gray-100 text-gray-800">No</Badge>
+                              }
+                            </TableCell>
+                            <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Document Management */}
+          <TabsContent value="document-management">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Document Management
+                </CardTitle>
+                <CardDescription>Centralized document storage and management with version control</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-6">
+                  <DocumentUpload onUploadComplete={fetchData} />
+                </div>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Document Name</TableHead>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Type</TableHead>
+                      <TableHead>Size</TableHead>
+                      <TableHead>Upload Date</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {documents.map((doc) => (
+                      <TableRow key={doc.id}>
+                        <TableCell className="font-medium">{doc.document_name}</TableCell>
+                        <TableCell>
+                          {doc.vendors ? `${doc.vendors.legal_entity_name} (${doc.vendors.email})` : doc.vendor_id}
+                        </TableCell>
+                        <TableCell className="capitalize">{doc.document_type}</TableCell>
+                        <TableCell>{doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : 'N/A'}</TableCell>
+                        <TableCell>{new Date(doc.upload_date).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          <Badge className={getStatusBadgeColor(doc.status)}>
+                            {doc.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-2">
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button variant="outline" size="sm">
+                              <Download className="h-4 w-4 mr-1" />
+                              Download
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
               </CardContent>
             </Card>
           </TabsContent>
@@ -591,7 +708,7 @@ const AdminDashboard = () => {
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Vendor ID</TableHead>
+                      <TableHead>Vendor</TableHead>
                       <TableHead>Compliance Type</TableHead>
                       <TableHead>Certification</TableHead>
                       <TableHead>Status</TableHead>
@@ -605,7 +722,9 @@ const AdminDashboard = () => {
                       const isExpiringSoon = item.expiry_date && new Date(item.expiry_date) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
                       return (
                         <TableRow key={item.id}>
-                          <TableCell className="font-mono text-sm">{item.vendor_id}</TableCell>
+                          <TableCell>
+                            {item.vendors ? `${item.vendors.legal_entity_name} (${item.vendors.email})` : item.vendor_id}
+                          </TableCell>
                           <TableCell className="capitalize">{item.compliance_type}</TableCell>
                           <TableCell>{item.certification_name || 'N/A'}</TableCell>
                           <TableCell>
@@ -635,68 +754,6 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Document Management */}
-          <TabsContent value="document-management">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Document Management
-                </CardTitle>
-                <CardDescription>Centralized document storage and management with version control</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-4">
-                  <Button className="flex items-center gap-2">
-                    <Upload className="h-4 w-4" />
-                    Upload Document
-                  </Button>
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Document Name</TableHead>
-                      <TableHead>Vendor ID</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Upload Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {documents.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell className="font-medium">{doc.document_name}</TableCell>
-                        <TableCell className="font-mono text-sm">{doc.vendor_id}</TableCell>
-                        <TableCell className="capitalize">{doc.document_type}</TableCell>
-                        <TableCell>{doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : 'N/A'}</TableCell>
-                        <TableCell>{new Date(doc.upload_date).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusBadgeColor(doc.status)}>
-                            {doc.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Download className="h-4 w-4 mr-1" />
-                              Download
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
           {/* Analytics & Reporting */}
           <TabsContent value="analytics-reporting">
             <Card>
@@ -705,34 +762,34 @@ const AdminDashboard = () => {
                   <BarChart3 className="h-5 w-5" />
                   Analytics & Reporting
                 </CardTitle>
-                <CardDescription>Comprehensive insights and performance metrics</CardDescription>
+                <CardDescription>Real-time insights and performance metrics</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
                   <div className="text-center p-6 bg-blue-50 rounded-lg">
                     <h3 className="text-lg font-semibold text-blue-900">Registration Completion Rate</h3>
                     <p className="text-3xl font-bold text-blue-600 mt-2">
-                      {Math.round((vendors.filter(v => v.calculated_status === 'approved').length / vendors.length) * 100) || 0}%
+                      {vendors.length > 0 ? Math.round((vendors.filter(v => v.calculated_status === 'approved').length / vendors.length) * 100) : 0}%
                     </p>
                     <p className="text-blue-700 mt-1">Approved/Total</p>
                   </div>
                   <div className="text-center p-6 bg-green-50 rounded-lg">
                     <h3 className="text-lg font-semibold text-green-900">Compliance Rate</h3>
                     <p className="text-3xl font-bold text-green-600 mt-2">
-                      {Math.round((compliance.filter(c => c.status === 'approved').length / (compliance.length || 1)) * 100)}%
+                      {compliance.length > 0 ? Math.round((compliance.filter(c => c.status === 'approved').length / compliance.length) * 100) : 0}%
                     </p>
                     <p className="text-green-700 mt-1">Compliant/Total</p>
                   </div>
                   <div className="text-center p-6 bg-purple-50 rounded-lg">
                     <h3 className="text-lg font-semibold text-purple-900">Document Processing</h3>
                     <p className="text-3xl font-bold text-purple-600 mt-2">
-                      {Math.round((documents.filter(d => d.status === 'active').length / (documents.length || 1)) * 100)}%
+                      {documents.length > 0 ? Math.round((documents.filter(d => d.status === 'active').length / documents.length) * 100) : 0}%
                     </p>
                     <p className="text-purple-700 mt-1">Active/Total</p>
                   </div>
                 </div>
                 <div className="flex gap-4">
-                  <Button className="flex items-center gap-2">
+                  <Button onClick={exportVendorData} className="flex items-center gap-2">
                     <Download className="h-4 w-4" />
                     Export Analytics Report
                   </Button>
@@ -753,19 +810,19 @@ const AdminDashboard = () => {
                   <Bell className="h-5 w-5" />
                   Audit & Notifications
                 </CardTitle>
-                <CardDescription>System activity monitoring and alert management</CardDescription>
+                <CardDescription>Real-time system activity monitoring and alert management</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-6">
                   <div>
-                    <h3 className="text-lg font-semibold mb-4">Recent System Activities</h3>
+                    <h3 className="text-lg font-semibold mb-4">Recent System Activities ({auditLogs.length} total)</h3>
                     <Table>
                       <TableHeader>
                         <TableRow>
                           <TableHead>Timestamp</TableHead>
                           <TableHead>Action</TableHead>
                           <TableHead>Entity</TableHead>
-                          <TableHead>Vendor/Admin ID</TableHead>
+                          <TableHead>Vendor ID</TableHead>
                           <TableHead>Details</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -778,6 +835,8 @@ const AdminDashboard = () => {
                                 log.action === 'CREATE' ? 'bg-green-100 text-green-800' :
                                 log.action === 'UPDATE' ? 'bg-blue-100 text-blue-800' :
                                 log.action === 'DELETE' ? 'bg-red-100 text-red-800' :
+                                log.action === 'APPROVE' ? 'bg-green-100 text-green-800' :
+                                log.action === 'REJECT' ? 'bg-red-100 text-red-800' :
                                 'bg-gray-100 text-gray-800'
                               }>
                                 {log.action}
@@ -795,7 +854,7 @@ const AdminDashboard = () => {
                   </div>
                   
                   <div>
-                    <h3 className="text-lg font-semibold mb-4">Active Notifications ({notifications.filter(n => !n.is_read).length} unread)</h3>
+                    <h3 className="text-lg font-semibold mb-4">Active Notifications ({notifications.filter(n => !n.is_read).length} unread of {notifications.length} total)</h3>
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -803,6 +862,7 @@ const AdminDashboard = () => {
                           <TableHead>Message</TableHead>
                           <TableHead>Type</TableHead>
                           <TableHead>Priority</TableHead>
+                          <TableHead>Vendor ID</TableHead>
                           <TableHead>Created</TableHead>
                           <TableHead>Status</TableHead>
                         </TableRow>
@@ -822,6 +882,7 @@ const AdminDashboard = () => {
                                 {notification.priority}
                               </Badge>
                             </TableCell>
+                            <TableCell className="font-mono text-sm">{notification.vendor_id || 'N/A'}</TableCell>
                             <TableCell>{new Date(notification.created_at).toLocaleDateString()}</TableCell>
                             <TableCell>
                               <Badge className={notification.is_read ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'}>

@@ -41,6 +41,15 @@ const AdminLogin = () => {
     return result;
   };
 
+  const hashPassword = async (password: string) => {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(password);
+    const hash = await crypto.subtle.digest('SHA-256', data);
+    return Array.from(new Uint8Array(hash))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('');
+  };
+
   const sendAdminConfirmationEmail = async (email: string, action: string, adminId?: string) => {
     try {
       console.log('📧 Sending admin confirmation email...');
@@ -70,6 +79,9 @@ const AdminLogin = () => {
 
     try {
       console.log('🔐 Admin sign in attempt:', loginData.email);
+      
+      const hashedPassword = await hashPassword(loginData.password);
+      console.log('🔒 Password hashed for verification');
 
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
@@ -78,7 +90,7 @@ const AdminLogin = () => {
           admin_profiles!inner(admin_id)
         `)
         .eq('email', loginData.email)
-        .eq('password_hash', loginData.password)
+        .eq('password_hash', hashedPassword)
         .eq('is_active', true)
         .single();
 
@@ -141,12 +153,15 @@ const AdminLogin = () => {
         return;
       }
 
+      const hashedPassword = await hashPassword(signupData.password);
+      console.log('🔒 Password hashed for storage');
+
       const { data: newAdmin, error: createError } = await supabase
         .from('admin_users')
         .insert({
           name: signupData.name,
           email: signupData.email,
-          password_hash: signupData.password,
+          password_hash: hashedPassword,
           role: 'admin',
           is_active: true
         })

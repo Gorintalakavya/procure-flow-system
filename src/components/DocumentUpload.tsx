@@ -1,92 +1,98 @@
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Upload, FileText, X, Check } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Upload, FileText, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 interface DocumentUploadProps {
-  vendorId?: string;
   onUploadComplete?: () => void;
 }
 
-const DocumentUpload: React.FC<DocumentUploadProps> = ({ vendorId, onUploadComplete }) => {
-  const [isOpen, setIsOpen] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+const DocumentUpload: React.FC<DocumentUploadProps> = ({ onUploadComplete }) => {
+  const [file, setFile] = useState<File | null>(null);
+  const [vendorId, setVendorId] = useState('');
   const [documentType, setDocumentType] = useState('');
   const [documentName, setDocumentName] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [vendors, setVendors] = useState<any[]>([]);
+  const [vendorsLoaded, setVendorsLoaded] = useState(false);
 
-  const documentTypes = [
-    'contract',
-    'invoice',
-    'purchase_order',
-    'compliance_form',
-    'tax_document',
-    'certificate',
-    'insurance',
-    'other'
-  ];
+  React.useEffect(() => {
+    fetchVendors();
+  }, []);
 
-  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      // Check file size (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
+  const fetchVendors = async () => {
+    try {
+      const { data: vendorsData } = await supabase
+        .from('vendors')
+        .select('vendor_id, legal_entity_name, email')
+        .order('legal_entity_name');
+      
+      setVendors(vendorsData || []);
+      setVendorsLoaded(true);
+    } catch (error) {
+      console.error('❌ Error fetching vendors:', error);
+      toast.error('Failed to load vendors');
+    }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile) {
+      // Validate file size (max 10MB)
+      if (selectedFile.size > 10 * 1024 * 1024) {
         toast.error('File size must be less than 10MB');
         return;
       }
-
-      // Check file type
+      
+      // Validate file type
       const allowedTypes = [
         'application/pdf',
         'application/msword',
         'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'image/jpeg',
         'image/png',
-        'image/gif'
+        'text/plain'
       ];
-
-      if (!allowedTypes.includes(file.type)) {
-        toast.error('File type not supported. Please upload PDF, DOC, DOCX, XLS, XLSX, or image files.');
+      
+      if (!allowedTypes.includes(selectedFile.type)) {
+        toast.error('Only PDF, Word, Image, and Text files are allowed');
         return;
       }
-
-      setSelectedFile(file);
+      
+      setFile(selectedFile);
       if (!documentName) {
-        setDocumentName(file.name);
+        setDocumentName(selectedFile.name);
       }
     }
   };
 
-  const handleUpload = async () => {
-    if (!selectedFile || !documentType || !documentName) {
-      toast.error('Please fill in all required fields and select a file');
+  const handleUpload = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!file || !vendorId || !documentType || !documentName) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
     setIsUploading(true);
 
     try {
-      // Generate unique file path
-      const fileExt = selectedFile.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `${vendorId || 'admin'}/${fileName}`;
-
-      // Upload file to Supabase Storage
+      // Upload file to Supabase storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${vendorId}/${Date.now()}.${fileExt}`;
+      
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('vendor-documents')
-        .upload(filePath, selectedFile);
+        .upload(fileName, file);
 
       if (uploadError) {
-        console.error('Upload error:', uploadError);
+        console.error('❌ Upload error:', uploadError);
         throw uploadError;
       }
 
@@ -96,76 +102,130 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ vendorId, onUploadCompl
         .insert({
           document_name: documentName,
           document_type: documentType,
-          vendor_id: vendorId || null,
-          file_path: filePath,
-          file_size: selectedFile.size,
+          vendor_id: vendorId,
+          file_path: uploadData.path,
+          file_size: file.size,
+          uploaded_by: 'admin',
           status: 'active',
-          uploaded_by: 'user', // You might want to get this from current user context
+          tags: [documentType],
           metadata: {
-            original_name: selectedFile.name,
-            mime_type: selectedFile.type,
-            upload_timestamp: new Date().toISOString()
+            original_name: file.name,
+            mime_type: file.type,
+            upload_source: 'admin_dashboard'
           }
         });
 
       if (dbError) {
-        console.error('Database error:', dbError);
+        console.error('❌ Database error:', dbError);
         throw dbError;
       }
+
+      // Log the upload action
+      await supabase
+        .from('audit_logs')
+        .insert({
+          vendor_id: vendorId,
+          action: 'UPLOAD',
+          entity_type: 'document',
+          entity_id: documentName,
+          new_values: {
+            document_name: documentName,
+            document_type: documentType,
+            file_size: file.size
+          },
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        });
+
+      // Send notification
+      await supabase
+        .from('notifications')
+        .insert({
+          title: 'Document Uploaded',
+          message: `Document "${documentName}" has been uploaded for vendor ${vendorId}`,
+          notification_type: 'document_upload',
+          priority: 'medium',
+          vendor_id: vendorId
+        });
 
       toast.success('Document uploaded successfully!');
       
       // Reset form
-      setSelectedFile(null);
+      setFile(null);
+      setVendorId('');
       setDocumentType('');
       setDocumentName('');
-      setIsOpen(false);
       
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-
-      // Callback to refresh parent component
+      // Refresh parent component
       if (onUploadComplete) {
         onUploadComplete();
       }
 
     } catch (error) {
-      console.error('Upload failed:', error);
-      toast.error('Failed to upload document. Please try again.');
+      console.error('❌ Upload failed:', error);
+      toast.error('Failed to upload document');
     } finally {
       setIsUploading(false);
     }
   };
 
-  const removeSelectedFile = () => {
-    setSelectedFile(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+  const removeFile = () => {
+    setFile(null);
+    setDocumentName('');
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button className="flex items-center gap-2">
-          <Upload className="h-4 w-4" />
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Upload className="h-5 w-5" />
           Upload Document
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle>Upload Document</DialogTitle>
-          <DialogDescription>
-            Upload documents for vendor compliance and record keeping.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="space-y-4">
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleUpload} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="vendor-select">Select Vendor *</Label>
+              <Select value={vendorId} onValueChange={setVendorId} required>
+                <SelectTrigger>
+                  <SelectValue placeholder={vendorsLoaded ? "Choose a vendor" : "Loading vendors..."} />
+                </SelectTrigger>
+                <SelectContent>
+                  {vendors.map((vendor) => (
+                    <SelectItem key={vendor.vendor_id} value={vendor.vendor_id}>
+                      {vendor.legal_entity_name} ({vendor.vendor_id})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="document-type">Document Type *</Label>
+              <Select value={documentType} onValueChange={setDocumentType} required>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select document type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contract">Contract</SelectItem>
+                  <SelectItem value="invoice">Invoice</SelectItem>
+                  <SelectItem value="po">Purchase Order</SelectItem>
+                  <SelectItem value="compliance">Compliance Document</SelectItem>
+                  <SelectItem value="tax_form">Tax Form</SelectItem>
+                  <SelectItem value="certificate">Certificate</SelectItem>
+                  <SelectItem value="agreement">Agreement</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <div>
             <Label htmlFor="document-name">Document Name *</Label>
             <Input
               id="document-name"
+              type="text"
               value={documentName}
               onChange={(e) => setDocumentName(e.target.value)}
               placeholder="Enter document name"
@@ -174,101 +234,90 @@ const DocumentUpload: React.FC<DocumentUploadProps> = ({ vendorId, onUploadCompl
           </div>
 
           <div>
-            <Label htmlFor="document-type">Document Type *</Label>
-            <Select value={documentType} onValueChange={setDocumentType}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select document type" />
-              </SelectTrigger>
-              <SelectContent>
-                {documentTypes.map((type) => (
-                  <SelectItem key={type} value={type}>
-                    {type.split('_').map(word => 
-                      word.charAt(0).toUpperCase() + word.slice(1)
-                    ).join(' ')}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div>
-            <Label htmlFor="file-upload">Select File *</Label>
+            <Label htmlFor="file-upload">Choose File *</Label>
             <div className="mt-2">
-              {!selectedFile ? (
-                <div
-                  className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center cursor-pointer hover:border-gray-400 transition-colors"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Upload className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">Click to select a file</p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    PDF, DOC, DOCX, XLS, XLSX, or images (max 10MB)
-                  </p>
+              {!file ? (
+                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                  <Upload className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 mb-2">Click to select a file or drag and drop</p>
+                  <p className="text-sm text-gray-500">PDF, DOC, DOCX, JPG, PNG, TXT (max 10MB)</p>
+                  <Input
+                    id="file-upload"
+                    type="file"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.txt"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                  >
+                    Select File
+                  </Button>
                 </div>
               ) : (
                 <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center space-x-3">
                       <FileText className="h-8 w-8 text-blue-500" />
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{selectedFile.name}</p>
-                        <p className="text-xs text-gray-500">
-                          {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+                        <p className="font-medium text-gray-900">{file.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {(file.size / 1024 / 1024).toFixed(2)} MB
                         </p>
                       </div>
                     </div>
                     <Button
+                      type="button"
                       variant="ghost"
                       size="sm"
-                      onClick={removeSelectedFile}
-                      className="text-gray-500 hover:text-red-500"
+                      onClick={removeFile}
+                      className="text-red-500 hover:text-red-700"
                     >
                       <X className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               )}
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileSelect}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif"
-              />
             </div>
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex justify-end space-x-2">
             <Button
+              type="button"
               variant="outline"
-              onClick={() => setIsOpen(false)}
-              className="flex-1"
-              disabled={isUploading}
+              onClick={() => {
+                setFile(null);
+                setVendorId('');
+                setDocumentType('');
+                setDocumentName('');
+              }}
             >
               Cancel
             </Button>
             <Button
-              onClick={handleUpload}
-              disabled={isUploading || !selectedFile || !documentType || !documentName}
-              className="flex-1"
+              type="submit"
+              disabled={isUploading || !file || !vendorId || !documentType || !documentName}
+              className="flex items-center gap-2"
             >
               {isUploading ? (
-                <div className="flex items-center gap-2">
+                <>
                   <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
                   Uploading...
-                </div>
+                </>
               ) : (
-                <div className="flex items-center gap-2">
-                  <Check className="h-4 w-4" />
-                  Upload
-                </div>
+                <>
+                  <Upload className="h-4 w-4" />
+                  Upload Document
+                </>
               )}
             </Button>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </form>
+      </CardContent>
+    </Card>
   );
 };
 
