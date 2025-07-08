@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -5,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Building2, ArrowLeft, Mail, Phone, Globe, MapPin, FileText } from "lucide-react";
+import { Building2, ArrowLeft, Mail, Phone, Globe, MapPin } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -30,36 +31,30 @@ const VendorRegistration = () => {
     city: '',
     state: '',
     postalCode: '',
-    country: 'United States',
+    country: 'US',
     productsServicesDescription: ''
   });
 
   const generateUniqueVendorId = () => {
-    // Generate 10-digit Vendor ID with mix of letters and numbers
+    // Generate 10-character Vendor ID: VEN + 4 letters + 3 numbers
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const numbers = '0123456789';
     let result = 'VEN';
     
-    // Add 4 random letters
     for (let i = 0; i < 4; i++) {
       result += letters.charAt(Math.floor(Math.random() * letters.length));
     }
     
-    // Add 3 random numbers
     for (let i = 0; i < 3; i++) {
       result += numbers.charAt(Math.floor(Math.random() * numbers.length));
     }
     
-    return result; // Total: 10 characters (VEN + 4 letters + 3 numbers)
+    return result;
   };
 
   const sendVendorConfirmationEmail = async (email: string, action: string, vendorId?: string) => {
     try {
       console.log('📧 Sending vendor confirmation email...');
-      console.log('Email:', email);
-      console.log('Action:', action);
-      console.log('Vendor ID:', vendorId);
-
       const response = await supabase.functions.invoke('send-confirmation-email', {
         body: {
           email,
@@ -69,18 +64,13 @@ const VendorRegistration = () => {
         }
       });
 
-      console.log('📧 Email function response:', response);
-
       if (response.error) {
         console.error('❌ Error sending vendor confirmation email:', response.error);
-        toast.error('Failed to send confirmation email');
       } else {
         console.log('✅ Vendor confirmation email sent successfully');
-        toast.success('Confirmation email sent successfully!');
       }
     } catch (error) {
       console.error('❌ Error invoking vendor email function:', error);
-      toast.error('Failed to send confirmation email');
     }
   };
 
@@ -98,7 +88,6 @@ const VendorRegistration = () => {
     try {
       console.log('📝 Vendor registration attempt...');
 
-      // Validate required fields
       const requiredFields = [
         'legalEntityName', 'vendorType', 'contactName', 'email',
         'streetAddress', 'city', 'state', 'postalCode', 'country'
@@ -111,11 +100,9 @@ const VendorRegistration = () => {
         return;
       }
 
-      // Generate unique 10-digit vendor ID
       const vendorId = generateUniqueVendorId();
       console.log('🆔 Generated Vendor ID:', vendorId);
 
-      // Check if vendor with same email already exists
       const { data: existingVendor } = await supabase
         .from('vendors')
         .select('email')
@@ -127,7 +114,6 @@ const VendorRegistration = () => {
         return;
       }
 
-      // Insert vendor data
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
         .insert({
@@ -150,7 +136,7 @@ const VendorRegistration = () => {
           postal_code: formData.postalCode,
           country: formData.country,
           products_services_description: formData.productsServicesDescription || null,
-          registration_status: 'pending',
+          registration_status: 'incomplete',
           currency: 'USD'
         })
         .select()
@@ -163,7 +149,6 @@ const VendorRegistration = () => {
 
       console.log('✅ Vendor registered successfully:', vendorData);
 
-      // Log the registration
       await supabase
         .from('audit_logs')
         .insert({
@@ -171,24 +156,22 @@ const VendorRegistration = () => {
           action: 'REGISTER',
           entity_type: 'vendor',
           entity_id: vendorId,
-          new_values: { registration_status: 'pending' },
+          new_values: { registration_status: 'incomplete' },
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         });
 
-      // Send registration confirmation email
       await sendVendorConfirmationEmail(formData.email, 'registration', vendorId);
 
+      // Store pending vendor data in localStorage
+      localStorage.setItem('pendingVendor', JSON.stringify({
+        vendorId: vendorId,
+        email: formData.email,
+        fromRegistration: true
+      }));
+
       toast.success('Vendor registration submitted successfully!');
-      
-      // Navigate to vendor auth page with vendor ID
-      navigate('/vendor-auth', { 
-        state: { 
-          vendorId: vendorId,
-          email: formData.email,
-          fromRegistration: true 
-        } 
-      });
+      navigate('/vendor-auth');
 
     } catch (error) {
       console.error('❌ Registration error:', error);
@@ -424,12 +407,15 @@ const VendorRegistration = () => {
                         <SelectValue placeholder="Select country" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="United States">United States</SelectItem>
-                        <SelectItem value="Canada">Canada</SelectItem>
-                        <SelectItem value="United Kingdom">United Kingdom</SelectItem>
-                        <SelectItem value="Australia">Australia</SelectItem>
-                        <SelectItem value="Germany">Germany</SelectItem>
-                        <SelectItem value="France">France</SelectItem>
+                        <SelectItem value="US">United States</SelectItem>
+                        <SelectItem value="CA">Canada</SelectItem>
+                        <SelectItem value="GB">United Kingdom</SelectItem>
+                        <SelectItem value="AU">Australia</SelectItem>
+                        <SelectItem value="DE">Germany</SelectItem>
+                        <SelectItem value="FR">France</SelectItem>
+                        <SelectItem value="IN">India</SelectItem>
+                        <SelectItem value="JP">Japan</SelectItem>
+                        <SelectItem value="CN">China</SelectItem>
                         <SelectItem value="Other">Other</SelectItem>
                       </SelectContent>
                     </Select>

@@ -16,7 +16,6 @@ interface EmailRequest {
 const handler = async (req: Request): Promise<Response> => {
   console.log('📧 Email function called with method:', req.method);
   
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -33,7 +32,6 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('- Section:', section);
     console.log('- Action:', action);
 
-    // Create email content based on section and action type
     let subject = '';
     let htmlContent = '';
     let textContent = '';
@@ -68,24 +66,12 @@ const handler = async (req: Request): Promise<Response> => {
                 <p style="margin: 5px 0;"><strong>🕐 Created:</strong> ${new Date().toLocaleString()}</p>
               </div>
               
-              <p>You now have full administrative access to:</p>
-              <ul style="background-color: #f0f7ff; padding: 15px 15px 15px 35px; border-radius: 5px; margin: 15px 0;">
-                <li>Manage vendor registrations and approvals</li>
-                <li>Monitor compliance and certifications</li>
-                <li>Access analytics and reporting tools</li>
-                <li>Manage user roles and permissions</li>
-                <li>Oversee document management system</li>
-              </ul>
+              <p>You now have full administrative access to manage vendor registrations, compliance tracking, and system oversight.</p>
               
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${Deno.env.get('SUPABASE_URL') || 'https://your-app-url.com'}/admin-dashboard" 
-                   style="background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-                  🔗 Access Admin Dashboard
-                </a>
-              </div>
-              
-              <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeaa7; margin: 20px 0;">
-                <p style="margin: 0; color: #856404;"><strong>Security Reminder:</strong> Keep your Admin ID confidential and use strong passwords.</p>
+                <p style="background-color: #667eea; color: white; padding: 12px 30px; border-radius: 5px; font-weight: bold; display: inline-block; margin: 0;">
+                  🔗 Access Your Admin Dashboard
+                </p>
               </div>
               
               <p>If you have any questions or need assistance, please contact our support team.</p>
@@ -124,10 +110,6 @@ const handler = async (req: Request): Promise<Response> => {
                 <p style="margin: 5px 0;"><strong>🆔 Admin ID:</strong> ${vendorId}</p>
               </div>
               
-              <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border: 1px solid #f5c6cb; margin: 20px 0;">
-                <p style="margin: 0; color: #721c24;"><strong>Security Alert:</strong> If this wasn't you, please contact our support team immediately.</p>
-              </div>
-              
               <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
             </div>
           </body>
@@ -160,13 +142,13 @@ const handler = async (req: Request): Promise<Response> => {
                 <h3 style="margin-top: 0; color: #28a745;">Registration Details:</h3>
                 <p style="margin: 5px 0;"><strong>🆔 Vendor ID:</strong> ${vendorId}</p>
                 <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${email}</p>
-                <p style="margin: 5px 0;"><strong>📋 Registration Status:</strong> Pending Review</p>
+                <p style="margin: 5px 0;"><strong>📋 Registration Status:</strong> Incomplete</p>
                 <p style="margin: 5px 0;"><strong>🕐 Submitted:</strong> ${new Date().toLocaleString()}</p>
               </div>
               
               <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeaa7; margin: 20px 0;">
                 <h3 style="margin-top: 0; color: #856404;">Important: Next Steps Required</h3>
-                <p style="margin: 0;">Your registration has been submitted and is currently under review. Please create your login credentials to access your vendor profile.</p>
+                <p style="margin: 0;">Your registration has been submitted. Please create your login credentials to access your vendor profile and complete your registration.</p>
               </div>
               
               <p><strong>Next steps:</strong></p>
@@ -176,13 +158,6 @@ const handler = async (req: Request): Promise<Response> => {
                 <li>📄 Upload required compliance documents</li>
                 <li>⏳ Wait for admin approval</li>
               </ol>
-              
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${Deno.env.get('SUPABASE_URL') || 'https://your-app-url.com'}/vendor-auth" 
-                   style="background-color: #28a745; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-                  🔗 Create Your Account
-                </a>
-              </div>
               
               <p>If you have any questions, please contact our support team with your Vendor ID: <strong>${vendorId}</strong></p>
               <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
@@ -230,13 +205,6 @@ const handler = async (req: Request): Promise<Response> => {
                 <li>📄 Document Uploads</li>
               </ul>
               
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="${Deno.env.get('SUPABASE_URL') || 'https://your-app-url.com'}/vendor-profile" 
-                   style="background-color: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; display: inline-block;">
-                  🔗 Access Your Profile
-                </a>
-              </div>
-              
               <p>If you have any questions, please contact our support team.</p>
               <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
             </div>
@@ -269,20 +237,46 @@ const handler = async (req: Request): Promise<Response> => {
                 <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${email}</p>
               </div>
               
-              <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; border: 1px solid #f5c6cb; margin: 20px 0;">
-                <p style="margin: 0; color: #721c24;"><strong>Security Alert:</strong> If this wasn't you, please contact our support team immediately.</p>
-              </div>
-              
               <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
             </div>
           </body>
           </html>
         `;
         textContent = `Vendor login successful for ${email} at ${new Date().toLocaleString()}`;
+      } else if (action === 'forgot-password') {
+        subject = `🔒 Password Reset Instructions - Procurement Portal`;
+        htmlContent = `
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Password Reset</title>
+          </head>
+          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); padding: 25px; text-align: center; border-radius: 10px 10px 0 0;">
+              <h1 style="color: white; margin: 0; font-size: 24px;">🔒 Password Reset Request</h1>
+            </div>
+            
+            <div style="background: white; padding: 25px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
+              <p>Dear User,</p>
+              <p>We received a request to reset your password for your account: <strong>${email}</strong></p>
+              
+              <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeaa7; margin: 20px 0;">
+                <p style="margin: 0; color: #856404;"><strong>Note:</strong> If you didn't request this password reset, please ignore this email. Your account remains secure.</p>
+              </div>
+              
+              <p>To reset your password, please contact our support team with your account details.</p>
+              <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
+            </div>
+          </body>
+          </html>
+        `;
+        textContent = `Password reset requested for ${email}. Please contact support for assistance.`;
       }
     }
 
-    // Simulate sending the email (In production, integrate with Resend, SendGrid, etc.)
+    // Log the email details for debugging
     const emailData = {
       to: email,
       subject: subject,
@@ -299,11 +293,9 @@ const handler = async (req: Request): Promise<Response> => {
     console.log('Subject:', subject);
     console.log('✅ Enhanced email content prepared successfully');
 
-    // In a real implementation, you would send the email here using a service like Resend
-    // Example with Resend:
-    // const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
-    // const emailResponse = await resend.emails.send(emailData);
-
+    // In a production environment, you would integrate with a real email service
+    // For now, we're simulating the email sending process
+    
     return new Response(JSON.stringify({ 
       success: true, 
       message: 'Enhanced confirmation email processed successfully',

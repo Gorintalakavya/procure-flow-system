@@ -54,6 +54,7 @@ const VendorAuth = () => {
         console.error('Error sending confirmation email:', error);
       } else {
         console.log('Confirmation email sent successfully');
+        toast.success('Confirmation email sent!');
       }
     } catch (error) {
       console.error('Error invoking email function:', error);
@@ -148,6 +149,12 @@ const VendorAuth = () => {
       if (createError) {
         throw createError;
       }
+
+      // Update vendor status to 'in_progress' after account creation
+      await supabase
+        .from('vendors')
+        .update({ registration_status: 'in_progress' })
+        .eq('vendor_id', signupData.vendorId);
 
       localStorage.setItem('vendorUser', JSON.stringify({
         id: newUser.id,

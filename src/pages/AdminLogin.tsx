@@ -25,52 +25,42 @@ const AdminLogin = () => {
   });
 
   const generateUniqueAdminId = () => {
-    // Generate 10-digit Admin ID with mix of letters and numbers
+    // Generate 10-character Admin ID: ADM + 4 letters + 3 numbers
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const numbers = '0123456789';
     let result = 'ADM';
     
-    // Add 4 random letters
     for (let i = 0; i < 4; i++) {
       result += letters.charAt(Math.floor(Math.random() * letters.length));
     }
     
-    // Add 3 random numbers
     for (let i = 0; i < 3; i++) {
       result += numbers.charAt(Math.floor(Math.random() * numbers.length));
     }
     
-    return result; // Total: 10 characters (ADM + 4 letters + 3 numbers)
+    return result;
   };
 
   const sendAdminConfirmationEmail = async (email: string, action: string, adminId?: string) => {
     try {
       console.log('📧 Sending admin confirmation email...');
-      console.log('Email:', email);
-      console.log('Action:', action);
-      console.log('Admin ID:', adminId);
-
       const response = await supabase.functions.invoke('send-confirmation-email', {
         body: {
           email,
-          vendorId: adminId || '', // Using vendorId parameter for admin ID
+          vendorId: adminId || '',
           section: 'admin',
           action
         }
       });
 
-      console.log('📧 Email function response:', response);
-
       if (response.error) {
         console.error('❌ Error sending admin confirmation email:', response.error);
-        toast.error('Failed to send confirmation email');
       } else {
         console.log('✅ Admin confirmation email sent successfully');
-        toast.success('Confirmation email sent successfully!');
+        toast.success('Confirmation email sent!');
       }
     } catch (error) {
       console.error('❌ Error invoking admin email function:', error);
-      toast.error('Failed to send confirmation email');
     }
   };
 
@@ -140,7 +130,6 @@ const AdminLogin = () => {
     try {
       console.log('📝 Admin signup attempt:', signupData.email);
 
-      // Check if admin already exists
       const { data: existingAdmin } = await supabase
         .from('admin_users')
         .select('email')
@@ -152,7 +141,6 @@ const AdminLogin = () => {
         return;
       }
 
-      // Create new admin user
       const { data: newAdmin, error: createError } = await supabase
         .from('admin_users')
         .insert({
@@ -170,11 +158,9 @@ const AdminLogin = () => {
         throw createError;
       }
 
-      // Generate unique 10-digit admin ID
       const adminId = generateUniqueAdminId();
       console.log('🆔 Generated Admin ID:', adminId);
       
-      // Create admin profile with the generated ID
       const { error: profileError } = await supabase
         .from('admin_profiles')
         .insert({
