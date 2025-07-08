@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Users, FileText, Shield, BarChart3, Bell, Download, Upload, Eye, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -68,6 +69,7 @@ const AdminDashboard = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [stats, setStats] = useState({
     totalVendors: 0,
     activeVendors: 0,
@@ -128,7 +130,6 @@ const AdminDashboard = () => {
         console.error('Error fetching vendors:', vendorsError);
         toast.error('Failed to load vendors');
       } else {
-        // Update vendor status based on completion
         const updatedVendors = vendorsData?.map(vendor => ({
           ...vendor,
           registration_status: calculateVendorStatus(vendor)
@@ -136,12 +137,12 @@ const AdminDashboard = () => {
         setVendors(updatedVendors);
       }
 
-      // Fetch admin users with profiles
+      // Fetch admin users with profiles - Fixed query
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select(`
           *,
-          admin_profiles!inner(admin_id)
+          admin_profiles(admin_id)
         `)
         .order('created_at', { ascending: false });
 
@@ -151,7 +152,7 @@ const AdminDashboard = () => {
       } else {
         const formattedAdmins = adminData?.map(admin => ({
           ...admin,
-          admin_id: admin.admin_profiles?.[0]?.admin_id || 'N/A'
+          admin_id: admin.admin_profiles?.[0]?.admin_id || 'Generating...'
         })) || [];
         setAdminUsers(formattedAdmins);
       }
@@ -302,7 +303,7 @@ const AdminDashboard = () => {
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">Admin ID: {adminUser.adminId}</span>
+              <span className="text-sm text-gray-600">Admin ID: <strong>{adminUser.adminId}</strong></span>
               <Button onClick={handleLogout} variant="outline">
                 Logout
               </Button>
@@ -368,7 +369,7 @@ const AdminDashboard = () => {
         <Tabs defaultValue="vendors" className="space-y-6">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="vendors">Vendor Management</TabsTrigger>
-            <TabsTrigger value="admin-users">Admin Users</TabsTrigger>
+            <TabsTrigger value="role-access">Role-Based Access</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="compliance">Compliance</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
@@ -399,6 +400,7 @@ const AdminDashboard = () => {
                         <TableHead>Type</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -414,6 +416,65 @@ const AdminDashboard = () => {
                           </TableCell>
                           <TableCell>{getStatusBadge(vendor.registration_status)}</TableCell>
                           <TableCell>{new Date(vendor.created_at).toLocaleDateString()}</TableCell>
+                          <TableCell>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setSelectedVendor(vendor)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl">
+                                <DialogHeader>
+                                  <DialogTitle>Vendor Details</DialogTitle>
+                                  <DialogDescription>
+                                    Complete information for {vendor.legal_entity_name}
+                                  </DialogDescription>
+                                </DialogHeader>
+                                {selectedVendor && (
+                                  <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                      <div>
+                                        <label className="font-semibold">Vendor ID:</label>
+                                        <p>{selectedVendor.vendor_id}</p>
+                                      </div>
+                                      <div>
+                                        <label className="font-semibold">Legal Entity Name:</label>
+                                        <p>{selectedVendor.legal_entity_name}</p>
+                                      </div>
+                                      <div>
+                                        <label className="font-semibold">Email:</label>
+                                        <p>{selectedVendor.email}</p>
+                                      </div>
+                                      <div>
+                                        <label className="font-semibold">Phone:</label>
+                                        <p>{selectedVendor.phone_number || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <label className="font-semibold">Website:</label>
+                                        <p>{selectedVendor.website || 'N/A'}</p>
+                                      </div>
+                                      <div>
+                                        <label className="font-semibold">Vendor Type:</label>
+                                        <p>{selectedVendor.vendor_type}</p>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <label className="font-semibold">Address:</label>
+                                      <p>{selectedVendor.street_address}, {selectedVendor.city}, {selectedVendor.state} {selectedVendor.postal_code}, {selectedVendor.country}</p>
+                                    </div>
+                                    <div>
+                                      <label className="font-semibold">Business Description:</label>
+                                      <p>{selectedVendor.business_description || 'N/A'}</p>
+                                    </div>
+                                  </div>
+                                )}
+                              </DialogContent>
+                            </Dialog>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -423,11 +484,11 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Admin Users */}
-          <TabsContent value="admin-users">
+          {/* Role-Based Access */}
+          <TabsContent value="role-access">
             <Card>
               <CardHeader>
-                <CardTitle>Admin Users</CardTitle>
+                <CardTitle>Role-Based Access Management</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="overflow-x-auto">
@@ -438,6 +499,7 @@ const AdminDashboard = () => {
                         <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Role</TableHead>
+                        <TableHead>Access Level</TableHead>
                         <TableHead>Status</TableHead>
                         <TableHead>Created</TableHead>
                       </TableRow>
@@ -450,6 +512,13 @@ const AdminDashboard = () => {
                           <TableCell>{admin.email}</TableCell>
                           <TableCell>
                             <Badge variant="secondary">{admin.role}</Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {admin.role === 'Admin' ? 'Full Access' : 
+                               admin.role === 'Procurement Officer' ? 'Vendor Management' :
+                               admin.role === 'Finance Team' ? 'Financial Data' : 'Limited Access'}
+                            </Badge>
                           </TableCell>
                           <TableCell>
                             <Badge variant={admin.is_active ? "default" : "destructive"}>
@@ -468,51 +537,47 @@ const AdminDashboard = () => {
 
           {/* Documents */}
           <TabsContent value="documents">
-            <div className="space-y-6">
-              <DocumentUpload onUploadComplete={fetchDashboardData} />
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle>Recent Documents</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Document Name</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Vendor ID</TableHead>
-                          <TableHead>Size</TableHead>
-                          <TableHead>Uploaded By</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Date</TableHead>
+            <Card>
+              <CardHeader>
+                <CardTitle>Document Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Document Name</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Vendor ID</TableHead>
+                        <TableHead>Size</TableHead>
+                        <TableHead>Uploaded By</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Date</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {documents.slice(0, 10).map((doc) => (
+                        <TableRow key={doc.id}>
+                          <TableCell className="font-medium">{doc.document_name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{doc.document_type}</Badge>
+                          </TableCell>
+                          <TableCell className="font-mono text-sm">{doc.vendor_id}</TableCell>
+                          <TableCell>{doc.file_size ? `${(doc.file_size / 1024 / 1024).toFixed(2)} MB` : 'N/A'}</TableCell>
+                          <TableCell>{doc.uploaded_by}</TableCell>
+                          <TableCell>
+                            <Badge variant={doc.status === 'active' ? 'default' : 'secondary'}>
+                              {doc.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>{new Date(doc.upload_date).toLocaleDateString()}</TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {documents.slice(0, 10).map((doc) => (
-                          <TableRow key={doc.id}>
-                            <TableCell className="font-medium">{doc.document_name}</TableCell>
-                            <TableCell>
-                              <Badge variant="outline">{doc.document_type}</Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{doc.vendor_id}</TableCell>
-                            <TableCell>{doc.file_size ? `${(doc.file_size / 1024 / 1024).toFixed(2)} MB` : 'N/A'}</TableCell>
-                            <TableCell>{doc.uploaded_by}</TableCell>
-                            <TableCell>
-                              <Badge variant={doc.status === 'active' ? 'default' : 'secondary'}>
-                                {doc.status}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{new Date(doc.upload_date).toLocaleDateString()}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Compliance */}
@@ -542,6 +607,28 @@ const AdminDashboard = () => {
                     <h3 className="text-lg font-semibold text-red-900">Non-Compliant</h3>
                     <p className="text-3xl font-bold text-red-600">{Math.ceil(stats.pendingVendors / 2)}</p>
                     <p className="text-sm text-red-700">Vendors requiring attention</p>
+                  </div>
+                </div>
+                
+                {/* Compliance Requirements */}
+                <div className="mt-8">
+                  <h4 className="text-lg font-semibold mb-4">Required Documents</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { type: 'W-9/W-8BEN/W-8BEN-E forms', purpose: 'Tax forms for US/foreign vendors' },
+                      { type: 'ISO certificates', purpose: 'Quality assurance compliance' },
+                      { type: 'Business registration certificate', purpose: 'Proof of legal business' },
+                      { type: 'GST Registration', purpose: 'Required for Indian vendors' },
+                      { type: 'PAN Card', purpose: 'India tax ID verification' },
+                      { type: 'Bank verification letter', purpose: 'Optional, under financial' },
+                      { type: 'MSME/SSI certificate', purpose: 'Small business classification' },
+                      { type: 'Contracts/MOUs', purpose: 'Under Procurement Info' }
+                    ].map((doc, index) => (
+                      <div key={index} className="p-4 border rounded-lg">
+                        <h5 className="font-medium">{doc.type}</h5>
+                        <p className="text-sm text-gray-600">{doc.purpose}</p>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </CardContent>

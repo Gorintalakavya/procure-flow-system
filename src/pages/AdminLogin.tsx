@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Shield, Mail, Lock, User, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -21,11 +22,11 @@ const AdminLogin = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: ''
   });
 
   const generateUniqueAdminId = () => {
-    // Generate 10-character Admin ID: ADM + 4 letters + 3 numbers
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const numbers = '0123456789';
     let result = 'ADM';
@@ -71,10 +72,12 @@ const AdminLogin = () => {
     try {
       console.log('🔐 Admin sign in attempt:', loginData.email);
       
-      // First, check if admin user exists
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
-        .select('*')
+        .select(`
+          *,
+          admin_profiles!inner(admin_id)
+        `)
         .eq('email', loginData.email)
         .eq('is_active', true)
         .single();
@@ -85,21 +88,13 @@ const AdminLogin = () => {
         return;
       }
 
-      // Check password - compare plain text for now (in production, use proper hashing)
       if (adminData.password_hash !== loginData.password) {
         console.error('❌ Invalid password');
         toast.error('Invalid email or password');
         return;
       }
 
-      // Get admin profile
-      const { data: profileData } = await supabase
-        .from('admin_profiles')
-        .select('admin_id')
-        .eq('admin_user_id', adminData.id)
-        .single();
-
-      const adminId = profileData?.admin_id || '';
+      const adminId = adminData.admin_profiles?.[0]?.admin_id || '';
       console.log('✅ Admin login successful. Admin ID:', adminId);
 
       localStorage.setItem('adminUser', JSON.stringify({
@@ -136,6 +131,11 @@ const AdminLogin = () => {
       return;
     }
 
+    if (!signupData.role) {
+      toast.error('Please select a role');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -152,14 +152,13 @@ const AdminLogin = () => {
         return;
       }
 
-      // Store password as plain text for now (in production, use proper hashing)
       const { data: newAdmin, error: createError } = await supabase
         .from('admin_users')
         .insert({
           name: signupData.name,
           email: signupData.email,
           password_hash: signupData.password,
-          role: 'admin',
+          role: signupData.role,
           is_active: true
         })
         .select()
@@ -317,6 +316,21 @@ const AdminLogin = () => {
                         required
                       />
                     </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="admin-signup-role">Role</Label>
+                    <Select value={signupData.role} onValueChange={(value) => setSignupData(prev => ({ ...prev, role: value }))}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select your role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Admin">Admin</SelectItem>
+                        <SelectItem value="Procurement Officer">Procurement Officer</SelectItem>
+                        <SelectItem value="Finance Team">Finance Team</SelectItem>
+                        <SelectItem value="Vendor">Vendor</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   <div>

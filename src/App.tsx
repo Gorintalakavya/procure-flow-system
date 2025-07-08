@@ -10,6 +10,8 @@ import VendorAuth from "./pages/VendorAuth";
 import VendorProfile from "./pages/VendorProfile";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import AnalyticsReporting from "./pages/AnalyticsReporting";
+import AuditNotifications from "./pages/AuditNotifications";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,6 +29,8 @@ const App = () => (
           <Route path="/vendor-profile" element={<VendorProfile />} />
           <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/admin-dashboard" element={<AdminDashboard />} />
+          <Route path="/analytics-reporting" element={<AnalyticsReporting />} />
+          <Route path="/audit-notifications" element={<AuditNotifications />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
