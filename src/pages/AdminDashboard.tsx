@@ -28,6 +28,8 @@ interface Vendor {
   annual_revenue?: string;
   employee_count?: string;
   tax_id?: string;
+  street_address: string;
+  postal_code: string;
 }
 
 interface AdminUser {

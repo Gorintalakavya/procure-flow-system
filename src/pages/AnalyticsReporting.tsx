@@ -35,25 +35,25 @@ const AnalyticsReporting = () => {
 
       // Calculate vendor statistics
       const total = vendors?.length || 0;
-      const statusCounts = vendors?.reduce((acc, vendor) => {
+      const statusCounts: Record<string, number> = vendors?.reduce((acc, vendor) => {
         const status = vendor.registration_status || 'pending';
         acc[status] = (acc[status] || 0) + 1;
         return acc;
-      }, {});
+      }, {} as Record<string, number>) || {};
 
       setVendorStats({
         total,
-        active: statusCounts?.completed || 0,
-        pending: statusCounts?.pending || 0,
-        completed: statusCounts?.in_progress || 0
+        active: statusCounts.completed || 0,
+        pending: statusCounts.pending || 0,
+        completed: statusCounts.in_progress || 0
       });
 
       // Prepare chart data
       const chartData = [
-        { name: 'Completed', value: statusCounts?.completed || 0, color: '#10B981' },
-        { name: 'In Progress', value: statusCounts?.in_progress || 0, color: '#F59E0B' },
-        { name: 'Pending', value: statusCounts?.pending || 0, color: '#EF4444' },
-        { name: 'Incomplete', value: statusCounts?.incomplete || 0, color: '#6B7280' }
+        { name: 'Completed', value: statusCounts.completed || 0, color: '#10B981' },
+        { name: 'In Progress', value: statusCounts.in_progress || 0, color: '#F59E0B' },
+        { name: 'Pending', value: statusCounts.pending || 0, color: '#EF4444' },
+        { name: 'Incomplete', value: statusCounts.incomplete || 0, color: '#6B7280' }
       ];
 
       setChartData(chartData);
