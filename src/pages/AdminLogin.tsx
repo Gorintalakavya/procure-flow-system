@@ -72,6 +72,7 @@ const AdminLogin = () => {
     try {
       console.log('🔐 Admin sign in attempt:', loginData.email);
       
+      // First check if admin exists and get their data
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select(`
@@ -80,16 +81,23 @@ const AdminLogin = () => {
         `)
         .eq('email', loginData.email)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (adminError || !adminData) {
-        console.error('❌ Admin not found:', adminError);
+      if (adminError) {
+        console.error('❌ Database error:', adminError);
+        toast.error('Database error occurred');
+        return;
+      }
+
+      if (!adminData) {
+        console.error('❌ Admin not found with email:', loginData.email);
         toast.error('Invalid email or password');
         return;
       }
 
+      // Simple password comparison (in production, use proper hashing)
       if (adminData.password_hash !== loginData.password) {
-        console.error('❌ Invalid password');
+        console.error('❌ Invalid password for admin:', loginData.email);
         toast.error('Invalid email or password');
         return;
       }
@@ -97,6 +105,7 @@ const AdminLogin = () => {
       const adminId = adminData.admin_profiles?.[0]?.admin_id || '';
       console.log('✅ Admin login successful. Admin ID:', adminId);
 
+      // Store admin session data
       localStorage.setItem('adminUser', JSON.stringify({
         id: adminData.id,
         email: adminData.email,
@@ -141,23 +150,29 @@ const AdminLogin = () => {
     try {
       console.log('📝 Admin signup attempt:', signupData.email);
 
+      // Check if admin already exists
       const { data: existingAdmin } = await supabase
         .from('admin_users')
         .select('email')
         .eq('email', signupData.email)
-        .single();
+        .maybeSingle();
 
       if (existingAdmin) {
         toast.error('Admin with this email already exists');
         return;
       }
 
+      // Generate unique admin ID
+      const adminId = generateUniqueAdminId();
+      console.log('🆔 Generated Admin ID:', adminId);
+
+      // Create admin user
       const { data: newAdmin, error: createError } = await supabase
         .from('admin_users')
         .insert({
           name: signupData.name,
           email: signupData.email,
-          password_hash: signupData.password,
+          password_hash: signupData.password, // In production, hash this
           role: signupData.role,
           is_active: true
         })
@@ -166,12 +181,11 @@ const AdminLogin = () => {
 
       if (createError) {
         console.error('❌ Error creating admin:', createError);
-        throw createError;
+        toast.error('Failed to create admin account');
+        return;
       }
 
-      const adminId = generateUniqueAdminId();
-      console.log('🆔 Generated Admin ID:', adminId);
-      
+      // Create admin profile with generated ID
       const { error: profileError } = await supabase
         .from('admin_profiles')
         .insert({
@@ -181,9 +195,11 @@ const AdminLogin = () => {
 
       if (profileError) {
         console.error('❌ Error creating admin profile:', profileError);
-        throw profileError;
+        toast.error('Failed to create admin profile');
+        return;
       }
 
+      // Store admin session data
       localStorage.setItem('adminUser', JSON.stringify({
         id: newAdmin.id,
         email: newAdmin.email,

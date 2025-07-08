@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,11 +10,13 @@ import { User, DollarSign, FileText, Shield, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import DocumentUploadSection from "@/components/DocumentUploadSection";
 
 const VendorProfile = () => {
   const navigate = useNavigate();
   const [vendorData, setVendorData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(false);
+  
   const [generalInfo, setGeneralInfo] = useState({
     legal_entity_name: '',
     trade_name: '',
@@ -806,7 +807,7 @@ const VendorProfile = () => {
             </Card>
           </TabsContent>
 
-          {/* Compliance Information */}
+          {/* Compliance Information with Document Upload */}
           <TabsContent value="compliance">
             <Card>
               <CardHeader>
@@ -918,6 +919,9 @@ const VendorProfile = () => {
                 </Button>
               </CardContent>
             </Card>
+
+            {/* Document Upload Section */}
+            <DocumentUploadSection vendorId={vendorData.vendor_id} />
           </TabsContent>
         </Tabs>
       </div>
