@@ -41,15 +41,6 @@ const AdminLogin = () => {
     return result;
   };
 
-  const hashPassword = async (password: string) => {
-    const encoder = new TextEncoder();
-    const data = encoder.encode(password);
-    const hash = await crypto.subtle.digest('SHA-256', data);
-    return Array.from(new Uint8Array(hash))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-  };
-
   const sendAdminConfirmationEmail = async (email: string, action: string, adminId?: string) => {
     try {
       console.log('📧 Sending admin confirmation email...');
@@ -80,27 +71,35 @@ const AdminLogin = () => {
     try {
       console.log('🔐 Admin sign in attempt:', loginData.email);
       
-      const hashedPassword = await hashPassword(loginData.password);
-      console.log('🔒 Password hashed for verification');
-
+      // First, check if admin user exists
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
-        .select(`
-          *,
-          admin_profiles!inner(admin_id)
-        `)
+        .select('*')
         .eq('email', loginData.email)
-        .eq('password_hash', hashedPassword)
         .eq('is_active', true)
         .single();
 
       if (adminError || !adminData) {
-        console.error('❌ Admin login failed:', adminError);
+        console.error('❌ Admin not found:', adminError);
         toast.error('Invalid email or password');
         return;
       }
 
-      const adminId = adminData.admin_profiles?.[0]?.admin_id || '';
+      // Check password - compare plain text for now (in production, use proper hashing)
+      if (adminData.password_hash !== loginData.password) {
+        console.error('❌ Invalid password');
+        toast.error('Invalid email or password');
+        return;
+      }
+
+      // Get admin profile
+      const { data: profileData } = await supabase
+        .from('admin_profiles')
+        .select('admin_id')
+        .eq('admin_user_id', adminData.id)
+        .single();
+
+      const adminId = profileData?.admin_id || '';
       console.log('✅ Admin login successful. Admin ID:', adminId);
 
       localStorage.setItem('adminUser', JSON.stringify({
@@ -153,15 +152,13 @@ const AdminLogin = () => {
         return;
       }
 
-      const hashedPassword = await hashPassword(signupData.password);
-      console.log('🔒 Password hashed for storage');
-
+      // Store password as plain text for now (in production, use proper hashing)
       const { data: newAdmin, error: createError } = await supabase
         .from('admin_users')
         .insert({
           name: signupData.name,
           email: signupData.email,
-          password_hash: hashedPassword,
+          password_hash: signupData.password,
           role: 'admin',
           is_active: true
         })

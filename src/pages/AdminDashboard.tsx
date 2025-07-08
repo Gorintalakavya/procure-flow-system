@@ -1,243 +1,204 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Shield, Users, FileText, CheckCircle2, Clock, AlertTriangle, BarChart3, Bell, Building2, Eye, Check, X, LogOut, Download, Upload } from "lucide-react";
+import { Users, FileText, Shield, BarChart3, Bell, Download, Upload, Eye, CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import DocumentUpload from "@/components/DocumentUpload";
 
+interface Vendor {
+  vendor_id: string;
+  legal_entity_name: string;
+  email: string;
+  contact_name: string;
+  phone_number: string;
+  city: string;
+  state: string;
+  country: string;
+  vendor_type: string;
+  registration_status: string;
+  created_at: string;
+  business_description?: string;
+  website?: string;
+  annual_revenue?: string;
+  employee_count?: string;
+  tax_id?: string;
+}
+
+interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+  created_at: string;
+  admin_id?: string;
+}
+
+interface Document {
+  id: string;
+  document_name: string;
+  document_type: string;
+  vendor_id: string;
+  upload_date: string;
+  file_size: number;
+  status: string;
+  uploaded_by: string;
+}
+
+interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  notification_type: string;
+  priority: string;
+  created_at: string;
+  is_read: boolean;
+  vendor_id?: string;
+}
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('vendor-management');
-  const [vendors, setVendors] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [adminUsers, setAdminUsers] = useState<any[]>([]);
-  const [compliance, setCompliance] = useState<any[]>([]);
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
-  const [selectedVendor, setSelectedVendor] = useState<any>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalVendors: 0,
+    activeVendors: 0,
+    pendingVendors: 0,
+    totalDocuments: 0
+  });
 
   useEffect(() => {
-    fetchData();
-    // Set up real-time updates
-    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
-  }, []);
+    const adminUser = localStorage.getItem('adminUser');
+    if (!adminUser) {
+      navigate('/admin-login');
+      return;
+    }
 
-  const calculateVendorStatus = (vendor: any) => {
-    if (!vendor) return 'incomplete';
-    
+    fetchDashboardData();
+  }, [navigate]);
+
+  const calculateVendorStatus = (vendor: Vendor) => {
     const requiredFields = [
-      'legal_entity_name', 'email', 'contact_name', 'street_address', 
-      'city', 'state', 'postal_code', 'country', 'vendor_type',
-      'phone_number', 'business_description', 'tax_id'
+      'legal_entity_name', 'email', 'contact_name', 'phone_number',
+      'city', 'state', 'country', 'vendor_type'
     ];
     
-    const filledFields = requiredFields.filter(field => 
-      vendor[field] && vendor[field].toString().trim() !== ''
-    );
-    const completionPercentage = (filledFields.length / requiredFields.length) * 100;
-    
-    console.log(`Vendor ${vendor.vendor_id} completion: ${completionPercentage}%`, {
-      filled: filledFields.length,
-      total: requiredFields.length,
-      fields: filledFields
-    });
-    
-    if (completionPercentage >= 90) {
-      return vendor.registration_status === 'approved' ? 'approved' : 'pending_approval';
-    } else if (completionPercentage >= 70) {
-      return 'nearly_complete';
-    } else if (completionPercentage >= 40) {
-      return 'in_progress';
-    } else {
-      return 'incomplete';
-    }
+    const optionalFields = [
+      'business_description', 'website', 'annual_revenue', 
+      'employee_count', 'tax_id'
+    ];
+
+    const completedRequired = requiredFields.filter(field => 
+      vendor[field as keyof Vendor] && vendor[field as keyof Vendor] !== ''
+    ).length;
+
+    const completedOptional = optionalFields.filter(field => 
+      vendor[field as keyof Vendor] && vendor[field as keyof Vendor] !== ''
+    ).length;
+
+    const requiredCompletion = (completedRequired / requiredFields.length) * 100;
+    const optionalCompletion = (completedOptional / optionalFields.length) * 100;
+    const overallCompletion = (requiredCompletion * 0.8) + (optionalCompletion * 0.2);
+
+    if (overallCompletion >= 90) return 'completed';
+    if (overallCompletion >= 70) return 'in_progress';
+    if (overallCompletion >= 30) return 'incomplete';
+    return 'pending';
   };
 
-  const fetchData = async () => {
-    setIsLoading(true);
+  const fetchDashboardData = async () => {
     try {
-      // Fetch vendors with calculated status
-      const { data: vendorsData } = await supabase
+      setLoading(true);
+
+      // Fetch vendors
+      const { data: vendorsData, error: vendorsError } = await supabase
         .from('vendors')
         .select('*')
         .order('created_at', { ascending: false });
-      
-      const vendorsWithStatus = (vendorsData || []).map(vendor => ({
-        ...vendor,
-        calculated_status: calculateVendorStatus(vendor)
-      }));
-      setVendors(vendorsWithStatus);
 
-      // Fetch ALL vendor users (not limited to 2)
-      const { data: usersData } = await supabase
-        .from('user_roles')
-        .select('*')
-        .not('vendor_id', 'is', null)
-        .order('created_at', { ascending: false });
-      setUsers(usersData || []);
+      if (vendorsError) {
+        console.error('Error fetching vendors:', vendorsError);
+        toast.error('Failed to load vendors');
+      } else {
+        // Update vendor status based on completion
+        const updatedVendors = vendorsData?.map(vendor => ({
+          ...vendor,
+          registration_status: calculateVendorStatus(vendor)
+        })) || [];
+        setVendors(updatedVendors);
+      }
 
-      // Fetch admin users with their admin IDs properly
-      const { data: adminData } = await supabase
+      // Fetch admin users with profiles
+      const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select(`
           *,
           admin_profiles!inner(admin_id)
         `)
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
-      
-      const formattedAdminData = adminData?.map(admin => ({
-        id: admin.id,
-        user_email: admin.email,
-        name: admin.name,
-        role: 'admin',
-        admin_id: admin.admin_profiles?.[0]?.admin_id || 'N/A',
-        access_level: 'Full Access',
-        department: 'Administration',
-        created_at: admin.created_at
-      })) || [];
-      
-      setAdminUsers(formattedAdminData);
 
-      // Fetch compliance data with real vendor information
-      const { data: complianceData } = await supabase
-        .from('compliance_tracking')
-        .select(`
-          *,
-          vendors!inner(legal_entity_name, email)
-        `)
-        .order('created_at', { ascending: false });
-      setCompliance(complianceData || []);
+      if (adminError) {
+        console.error('Error fetching admin users:', adminError);
+        toast.error('Failed to load admin users');
+      } else {
+        const formattedAdmins = adminData?.map(admin => ({
+          ...admin,
+          admin_id: admin.admin_profiles?.[0]?.admin_id || 'N/A'
+        })) || [];
+        setAdminUsers(formattedAdmins);
+      }
 
-      // Fetch documents with real vendor information
-      const { data: documentsData } = await supabase
+      // Fetch documents
+      const { data: documentsData, error: documentsError } = await supabase
         .from('documents')
-        .select(`
-          *,
-          vendors(legal_entity_name, email)
-        `)
+        .select('*')
         .order('upload_date', { ascending: false });
-      setDocuments(documentsData || []);
 
-      // Fetch notifications with actual data
-      const { data: notificationsData } = await supabase
+      if (documentsError) {
+        console.error('Error fetching documents:', documentsError);
+      } else {
+        setDocuments(documentsData || []);
+      }
+
+      // Fetch notifications
+      const { data: notificationsData, error: notificationsError } = await supabase
         .from('notifications')
         .select('*')
-        .order('created_at', { ascending: false });
-      setNotifications(notificationsData || []);
+        .order('created_at', { ascending: false })
+        .limit(20);
 
-      // Fetch audit logs with detailed information
-      const { data: auditData } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .order('timestamp', { ascending: false });
-      setAuditLogs(auditData || []);
+      if (notificationsError) {
+        console.error('Error fetching notifications:', notificationsError);
+      } else {
+        setNotifications(notificationsData || []);
+      }
 
-      console.log('✅ Dashboard data refreshed:', {
-        vendors: vendorsWithStatus.length,
-        users: usersData?.length,
-        admins: formattedAdminData.length,
-        compliance: complianceData?.length,
-        documents: documentsData?.length,
-        notifications: notificationsData?.length,
-        audits: auditData?.length
+      // Calculate stats
+      const totalVendors = vendorsData?.length || 0;
+      const activeVendors = vendorsData?.filter(v => ['completed', 'in_progress'].includes(calculateVendorStatus(v))).length || 0;
+      const pendingVendors = vendorsData?.filter(v => ['pending', 'incomplete'].includes(calculateVendorStatus(v))).length || 0;
+      const totalDocuments = documentsData?.length || 0;
+
+      setStats({
+        totalVendors,
+        activeVendors,
+        pendingVendors,
+        totalDocuments
       });
 
     } catch (error) {
-      console.error('❌ Error fetching data:', error);
+      console.error('Error loading dashboard:', error);
       toast.error('Failed to load dashboard data');
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleVendorAction = async (vendorId: string, action: 'approve' | 'reject') => {
-    setIsLoading(true);
-    try {
-      const newStatus = action === 'approve' ? 'approved' : 'rejected';
-      
-      const { error } = await supabase
-        .from('vendors')
-        .update({ registration_status: newStatus })
-        .eq('vendor_id', vendorId);
-
-      if (error) throw error;
-
-      // Log the action
-      await supabase
-        .from('audit_logs')
-        .insert({
-          vendor_id: vendorId,
-          action: action.toUpperCase(),
-          entity_type: 'vendor',
-          entity_id: vendorId,
-          new_values: { registration_status: newStatus },
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
-
-      // Send notification
-      await supabase
-        .from('notifications')
-        .insert({
-          title: `Vendor ${action === 'approve' ? 'Approved' : 'Rejected'}`,
-          message: `Vendor ${vendorId} has been ${action}d by admin`,
-          notification_type: 'status_update',
-          priority: 'high',
-          vendor_id: vendorId
-        });
-
-      toast.success(`Vendor ${action}d successfully`);
-      fetchData(); // Refresh data
-    } catch (error) {
-      console.error(`❌ Error ${action}ing vendor:`, error);
-      toast.error(`Failed to ${action} vendor`);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const exportVendorData = () => {
-    try {
-      const csvContent = [
-        ['Vendor ID', 'Legal Entity Name', 'Email', 'Contact Name', 'Type', 'Status', 'Phone', 'City', 'State', 'Country', 'Created At'].join(','),
-        ...vendors.map(vendor => [
-          vendor.vendor_id,
-          `"${vendor.legal_entity_name}"`,
-          vendor.email,
-          `"${vendor.contact_name}"`,
-          vendor.vendor_type,
-          vendor.calculated_status,
-          vendor.phone_number || 'N/A',
-          `"${vendor.city}"`,
-          `"${vendor.state}"`,
-          vendor.country,
-          new Date(vendor.created_at).toLocaleDateString()
-        ].join(','))
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `vendor_data_${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      window.URL.revokeObjectURL(url);
-      toast.success('Vendor data exported successfully');
-    } catch (error) {
-      console.error('❌ Export error:', error);
-      toast.error('Failed to export vendor data');
+      setLoading(false);
     }
   };
 
@@ -247,94 +208,81 @@ const AdminDashboard = () => {
     toast.success('Logged out successfully');
   };
 
-  const getStatusBadgeColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'approved': return 'bg-green-100 text-green-800';
-      case 'pending_approval': return 'bg-blue-100 text-blue-800';
-      case 'nearly_complete': return 'bg-yellow-100 text-yellow-800';
-      case 'in_progress': return 'bg-orange-100 text-orange-800';
-      case 'incomplete': return 'bg-red-100 text-red-800';
-      case 'rejected': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+  const exportVendorsToCSV = () => {
+    if (vendors.length === 0) {
+      toast.error('No vendors to export');
+      return;
     }
+
+    const headers = [
+      'Vendor ID', 'Legal Entity Name', 'Email', 'Contact Name', 'Phone', 
+      'City', 'State', 'Country', 'Vendor Type', 'Status', 'Created Date',
+      'Business Description', 'Website', 'Annual Revenue', 'Employee Count', 'Tax ID'
+    ];
+
+    const csvData = vendors.map(vendor => [
+      vendor.vendor_id,
+      vendor.legal_entity_name,
+      vendor.email,
+      vendor.contact_name,
+      vendor.phone_number || '',
+      vendor.city,
+      vendor.state,
+      vendor.country,
+      vendor.vendor_type,
+      vendor.registration_status,
+      new Date(vendor.created_at).toLocaleDateString(),
+      vendor.business_description || '',
+      vendor.website || '',
+      vendor.annual_revenue || '',
+      vendor.employee_count || '',
+      vendor.tax_id || ''
+    ]);
+
+    const csvContent = [headers, ...csvData]
+      .map(row => row.map(field => `"${field}"`).join(','))
+      .join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    link.setAttribute('href', url);
+    link.setAttribute('download', `vendors_export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    toast.success('Vendors exported successfully!');
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'approved': return 'Approved';
-      case 'pending_approval': return 'Pending Approval';
-      case 'nearly_complete': return 'Nearly Complete';
-      case 'in_progress': return 'In Progress';
-      case 'incomplete': return 'Incomplete';
-      case 'rejected': return 'Rejected';
-      default: return 'Unknown';
-    }
+  const getStatusBadge = (status: string) => {
+    const statusConfig = {
+      completed: { variant: 'default' as const, icon: CheckCircle, label: 'Completed' },
+      in_progress: { variant: 'secondary' as const, icon: Clock, label: 'In Progress' },
+      incomplete: { variant: 'outline' as const, icon: AlertTriangle, label: 'Incomplete' },
+      pending: { variant: 'destructive' as const, icon: XCircle, label: 'Pending' }
+    };
+
+    const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending;
+    const Icon = config.icon;
+
+    return (
+      <Badge variant={config.variant} className="flex items-center gap-1">
+        <Icon className="h-3 w-3" />
+        {config.label}
+      </Badge>
+    );
   };
 
-  const VendorDetailsModal = ({ vendor, onClose }: { vendor: any, onClose: () => void }) => (
-    <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-      <DialogHeader>
-        <DialogTitle>Vendor Details - {vendor.legal_entity_name}</DialogTitle>
-        <DialogDescription>Complete vendor information and status</DialogDescription>
-      </DialogHeader>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <h3 className="font-semibold mb-2">General Information</h3>
-          <div className="space-y-2 text-sm">
-            <p><strong>Vendor ID:</strong> {vendor.vendor_id}</p>
-            <p><strong>Legal Entity Name:</strong> {vendor.legal_entity_name}</p>
-            <p><strong>Trade Name:</strong> {vendor.trade_name || 'N/A'}</p>
-            <p><strong>Type:</strong> {vendor.vendor_type}</p>
-            <p><strong>Email:</strong> {vendor.email}</p>
-            <p><strong>Phone:</strong> {vendor.phone_number || 'N/A'}</p>
-            <p><strong>Website:</strong> {vendor.website || 'N/A'}</p>
-            <p><strong>Business Description:</strong> {vendor.business_description || 'N/A'}</p>
-          </div>
-        </div>
-        <div>
-          <h3 className="font-semibold mb-2">Address Information</h3>
-          <div className="space-y-2 text-sm">
-            <p><strong>Street:</strong> {vendor.street_address}</p>
-            {vendor.street_address_line2 && <p><strong>Line 2:</strong> {vendor.street_address_line2}</p>}
-            <p><strong>City:</strong> {vendor.city}</p>
-            <p><strong>State:</strong> {vendor.state}</p>
-            <p><strong>Postal Code:</strong> {vendor.postal_code}</p>
-            <p><strong>Country:</strong> {vendor.country}</p>
-          </div>
-        </div>
-        <div>
-          <h3 className="font-semibold mb-2">Financial Information</h3>
-          <div className="space-y-2 text-sm">
-            <p><strong>Tax ID:</strong> {vendor.tax_id || 'N/A'}</p>
-            <p><strong>VAT ID:</strong> {vendor.vat_id || 'N/A'}</p>
-            <p><strong>Payment Terms:</strong> {vendor.payment_terms || 'N/A'}</p>
-            <p><strong>Currency:</strong> {vendor.currency}</p>
-            <p><strong>Bank Account:</strong> {vendor.bank_account_details || 'N/A'}</p>
-          </div>
-        </div>
-        <div>
-          <h3 className="font-semibold mb-2">Status & Compliance</h3>
-          <div className="space-y-2 text-sm">
-            <p><strong>Registration Status:</strong> 
-              <Badge className={`ml-2 ${getStatusBadgeColor(vendor.calculated_status)}`}>
-                {getStatusLabel(vendor.calculated_status)}
-              </Badge>
-            </p>
-            <p><strong>W-9 Status:</strong> {vendor.w9_status || 'N/A'}</p>
-            <p><strong>W8-BEN Status:</strong> {vendor.w8_ben_status || 'N/A'}</p>
-            <p><strong>W8-BEN-E Status:</strong> {vendor.w8_ben_e_status || 'N/A'}</p>
-          </div>
-        </div>
-      </div>
-    </DialogContent>
-  );
+  const adminUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
 
-  if (isLoading && vendors.length === 0) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p>Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -343,109 +291,98 @@ const AdminDashboard = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white shadow-lg border-b">
+      <div className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center space-x-3">
-              <Shield className="h-10 w-10 text-blue-600" />
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <Shield className="h-8 w-8 text-blue-600" />
               <div>
-                <h1 className="text-3xl font-bold text-gray-900">Admin Dashboard</h1>
-                <p className="text-gray-600">Vendor Management & Compliance Portal</p>
+                <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+                <p className="text-sm text-gray-500">Welcome back, {adminUser.name}</p>
               </div>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-gray-600">Welcome, Admin</span>
-              <Button variant="outline" onClick={handleLogout} className="flex items-center gap-2">
-                <LogOut className="h-4 w-4" />
+              <span className="text-sm text-gray-600">Admin ID: {adminUser.adminId}</span>
+              <Button onClick={handleLogout} variant="outline">
                 Logout
               </Button>
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Real-time Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card>
-            <CardContent className="flex items-center p-6">
-              <Building2 className="h-8 w-8 text-blue-500 mr-4" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{vendors.length}</p>
-                <p className="text-gray-600">Total Vendors</p>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Vendors</p>
+                  <p className="text-3xl font-bold text-gray-900">{stats.totalVendors}</p>
+                </div>
+                <Users className="h-8 w-8 text-blue-600" />
               </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="flex items-center p-6">
-              <Clock className="h-8 w-8 text-yellow-500 mr-4" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {vendors.filter(v => v.calculated_status === 'pending_approval').length}
-                </p>
-                <p className="text-gray-600">Pending Approval</p>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Active Vendors</p>
+                  <p className="text-3xl font-bold text-green-600">{stats.activeVendors}</p>
+                </div>
+                <CheckCircle className="h-8 w-8 text-green-600" />
               </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="flex items-center p-6">
-              <CheckCircle2 className="h-8 w-8 text-green-500 mr-4" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {vendors.filter(v => v.calculated_status === 'approved').length}
-                </p>
-                <p className="text-gray-600">Approved</p>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Pending Vendors</p>
+                  <p className="text-3xl font-bold text-orange-600">{stats.pendingVendors}</p>
+                </div>
+                <Clock className="h-8 w-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
+
           <Card>
-            <CardContent className="flex items-center p-6">
-              <AlertTriangle className="h-8 w-8 text-orange-500 mr-4" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">
-                  {vendors.filter(v => v.calculated_status === 'incomplete').length}
-                </p>
-                <p className="text-gray-600">Incomplete</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center p-6">
-              <FileText className="h-8 w-8 text-purple-500 mr-4" />
-              <div>
-                <p className="text-2xl font-bold text-gray-900">{documents.length}</p>
-                <p className="text-gray-600">Documents</p>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Total Documents</p>
+                  <p className="text-3xl font-bold text-purple-600">{stats.totalDocuments}</p>
+                </div>
+                <FileText className="h-8 w-8 text-purple-600" />
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Main Content */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="vendor-management">Vendor Management</TabsTrigger>
-            <TabsTrigger value="role-based-access">Role-Based Access</TabsTrigger>
-            <TabsTrigger value="compliance-tracking">Compliance Tracking</TabsTrigger>
-            <TabsTrigger value="document-management">Document Management</TabsTrigger>
-            <TabsTrigger value="analytics-reporting">Analytics & Reporting</TabsTrigger>
-            <TabsTrigger value="audit-notifications">Audit & Notifications</TabsTrigger>
+        {/* Tabs */}
+        <Tabs defaultValue="vendors" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="vendors">Vendor Management</TabsTrigger>
+            <TabsTrigger value="admin-users">Admin Users</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
+            <TabsTrigger value="notifications">Notifications</TabsTrigger>
           </TabsList>
 
           {/* Vendor Management */}
-          <TabsContent value="vendor-management">
+          <TabsContent value="vendors">
             <Card>
               <CardHeader>
                 <div className="flex justify-between items-center">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Building2 className="h-5 w-5" />
-                      Vendor Management
-                    </CardTitle>
-                    <CardDescription>Review and manage vendor registrations with real-time status tracking</CardDescription>
-                  </div>
-                  <Button onClick={exportVendorData} className="flex items-center gap-2">
+                  <CardTitle>Vendor Management</CardTitle>
+                  <Button onClick={exportVendorsToCSV} className="flex items-center gap-2">
                     <Download className="h-4 w-4" />
-                    Export to CSV
+                    Export CSV
                   </Button>
                 </div>
               </CardHeader>
@@ -455,90 +392,30 @@ const AdminDashboard = () => {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Vendor ID</TableHead>
-                        <TableHead>Legal Entity Name</TableHead>
+                        <TableHead>Company Name</TableHead>
                         <TableHead>Email</TableHead>
+                        <TableHead>Contact</TableHead>
+                        <TableHead>Location</TableHead>
                         <TableHead>Type</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Completion</TableHead>
-                        <TableHead>Actions</TableHead>
+                        <TableHead>Created</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {vendors.map((vendor) => {
-                        const requiredFields = ['legal_entity_name', 'email', 'contact_name', 'street_address', 'city', 'state', 'postal_code', 'country', 'vendor_type', 'phone_number', 'business_description', 'tax_id'];
-                        const filledFields = requiredFields.filter(field => vendor[field] && vendor[field].toString().trim() !== '');
-                        const completionPercentage = Math.round((filledFields.length / requiredFields.length) * 100);
-                        
-                        return (
-                          <TableRow key={vendor.id}>
-                            <TableCell className="font-medium font-mono">{vendor.vendor_id}</TableCell>
-                            <TableCell>{vendor.legal_entity_name}</TableCell>
-                            <TableCell>{vendor.email}</TableCell>
-                            <TableCell className="capitalize">{vendor.vendor_type}</TableCell>
-                            <TableCell>
-                              <Badge className={getStatusBadgeColor(vendor.calculated_status)}>
-                                {getStatusLabel(vendor.calculated_status)}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <div className="w-16 bg-gray-200 rounded-full h-2">
-                                  <div 
-                                    className={`h-2 rounded-full ${
-                                      completionPercentage >= 90 ? 'bg-green-600' :
-                                      completionPercentage >= 70 ? 'bg-yellow-600' :
-                                      completionPercentage >= 40 ? 'bg-orange-600' :
-                                      'bg-red-600'
-                                    }`}
-                                    style={{ width: `${completionPercentage}%` }}
-                                  ></div>
-                                </div>
-                                <span className="text-sm text-gray-600">{completionPercentage}%</span>
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Dialog>
-                                  <DialogTrigger asChild>
-                                    <Button variant="outline" size="sm" onClick={() => setSelectedVendor(vendor)}>
-                                      <Eye className="h-4 w-4 mr-1" />
-                                      View Details
-                                    </Button>
-                                  </DialogTrigger>
-                                  {selectedVendor && (
-                                    <VendorDetailsModal 
-                                      vendor={selectedVendor} 
-                                      onClose={() => setSelectedVendor(null)} 
-                                    />
-                                  )}
-                                </Dialog>
-                                {vendor.calculated_status === 'pending_approval' && (
-                                  <>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleVendorAction(vendor.vendor_id, 'approve')}
-                                      className="text-green-600 border-green-600 hover:bg-green-50"
-                                    >
-                                      <Check className="h-4 w-4 mr-1" />
-                                      Approve
-                                    </Button>
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => handleVendorAction(vendor.vendor_id, 'reject')}
-                                      className="text-red-600 border-red-600 hover:bg-red-50"
-                                    >
-                                      <X className="h-4 w-4 mr-1" />
-                                      Reject
-                                    </Button>
-                                  </>
-                                )}
-                              </div>
-                            </TableCell>
-                          </TableRow>
-                        );
-                      })}
+                      {vendors.map((vendor) => (
+                        <TableRow key={vendor.vendor_id}>
+                          <TableCell className="font-mono text-sm">{vendor.vendor_id}</TableCell>
+                          <TableCell className="font-medium">{vendor.legal_entity_name}</TableCell>
+                          <TableCell>{vendor.email}</TableCell>
+                          <TableCell>{vendor.contact_name}</TableCell>
+                          <TableCell>{vendor.city}, {vendor.state}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{vendor.vendor_type}</Badge>
+                          </TableCell>
+                          <TableCell>{getStatusBadge(vendor.registration_status)}</TableCell>
+                          <TableCell>{new Date(vendor.created_at).toLocaleDateString()}</TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </div>
@@ -546,354 +423,159 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
 
-          {/* Role-Based Access */}
-          <TabsContent value="role-based-access">
+          {/* Admin Users */}
+          <TabsContent value="admin-users">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="h-5 w-5" />
-                  Role-Based Access Control
-                </CardTitle>
-                <CardDescription>Manage user roles and permissions across the platform</CardDescription>
+                <CardTitle>Admin Users</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-6">
-                  {/* Admin Users Section */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Admin Users ({adminUsers.length})</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>User Email</TableHead>
-                          <TableHead>Name</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Admin ID</TableHead>
-                          <TableHead>Access Level</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Created</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {adminUsers.map((admin) => (
-                          <TableRow key={admin.id}>
-                            <TableCell className="font-medium">{admin.user_email}</TableCell>
-                            <TableCell>{admin.name || 'N/A'}</TableCell>
-                            <TableCell className="capitalize">
-                              <Badge className="bg-red-100 text-red-800">{admin.role}</Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{admin.admin_id}</TableCell>
-                            <TableCell>{admin.access_level}</TableCell>
-                            <TableCell>{admin.department}</TableCell>
-                            <TableCell>{new Date(admin.created_at).toLocaleDateString()}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  {/* Vendor Users Section */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Vendor Users ({users.length})</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>User Email</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Vendor ID</TableHead>
-                          <TableHead>Access Level</TableHead>
-                          <TableHead>Department</TableHead>
-                          <TableHead>Primary Contact</TableHead>
-                          <TableHead>Created</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {users.map((user) => (
-                          <TableRow key={user.id}>
-                            <TableCell className="font-medium">{user.user_email}</TableCell>
-                            <TableCell className="capitalize">
-                              <Badge className="bg-blue-100 text-blue-800">{user.role}</Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{user.vendor_id}</TableCell>
-                            <TableCell>{user.access_level || 'Standard'}</TableCell>
-                            <TableCell>{user.department || 'N/A'}</TableCell>
-                            <TableCell>
-                              {user.is_primary_contact ? 
-                                <Badge className="bg-green-100 text-green-800">Yes</Badge> : 
-                                <Badge className="bg-gray-100 text-gray-800">No</Badge>
-                              }
-                            </TableCell>
-                            <TableCell>{new Date(user.created_at).toLocaleDateString()}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Document Management */}
-          <TabsContent value="document-management">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-5 w-5" />
-                  Document Management
-                </CardTitle>
-                <CardDescription>Centralized document storage and management with version control</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="mb-6">
-                  <DocumentUpload onUploadComplete={fetchData} />
-                </div>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Document Name</TableHead>
-                      <TableHead>Vendor</TableHead>
-                      <TableHead>Type</TableHead>
-                      <TableHead>Size</TableHead>
-                      <TableHead>Upload Date</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {documents.map((doc) => (
-                      <TableRow key={doc.id}>
-                        <TableCell className="font-medium">{doc.document_name}</TableCell>
-                        <TableCell>
-                          {doc.vendors ? `${doc.vendors.legal_entity_name} (${doc.vendors.email})` : doc.vendor_id}
-                        </TableCell>
-                        <TableCell className="capitalize">{doc.document_type}</TableCell>
-                        <TableCell>{doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : 'N/A'}</TableCell>
-                        <TableCell>{new Date(doc.upload_date).toLocaleDateString()}</TableCell>
-                        <TableCell>
-                          <Badge className={getStatusBadgeColor(doc.status)}>
-                            {doc.status}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4 mr-1" />
-                              View
-                            </Button>
-                            <Button variant="outline" size="sm">
-                              <Download className="h-4 w-4 mr-1" />
-                              Download
-                            </Button>
-                          </div>
-                        </TableCell>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Admin ID</TableHead>
+                        <TableHead>Name</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Role</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Compliance Tracking */}
-          <TabsContent value="compliance-tracking">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <AlertTriangle className="h-5 w-5" />
-                  Compliance Tracking
-                </CardTitle>
-                <CardDescription>Monitor vendor compliance and certifications with expiry tracking</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Vendor</TableHead>
-                      <TableHead>Compliance Type</TableHead>
-                      <TableHead>Certification</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead>Expiry Date</TableHead>
-                      <TableHead>Score</TableHead>
-                      <TableHead>Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {compliance.map((item) => {
-                      const isExpiringSoon = item.expiry_date && new Date(item.expiry_date) <= new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-                      return (
-                        <TableRow key={item.id}>
+                    </TableHeader>
+                    <TableBody>
+                      {adminUsers.map((admin) => (
+                        <TableRow key={admin.id}>
+                          <TableCell className="font-mono text-sm">{admin.admin_id}</TableCell>
+                          <TableCell className="font-medium">{admin.name}</TableCell>
+                          <TableCell>{admin.email}</TableCell>
                           <TableCell>
-                            {item.vendors ? `${item.vendors.legal_entity_name} (${item.vendors.email})` : item.vendor_id}
+                            <Badge variant="secondary">{admin.role}</Badge>
                           </TableCell>
-                          <TableCell className="capitalize">{item.compliance_type}</TableCell>
-                          <TableCell>{item.certification_name || 'N/A'}</TableCell>
                           <TableCell>
-                            <Badge className={getStatusBadgeColor(item.status)}>
-                              {item.status}
+                            <Badge variant={admin.is_active ? "default" : "destructive"}>
+                              {admin.is_active ? "Active" : "Inactive"}
                             </Badge>
-                            {isExpiringSoon && (
-                              <Badge className="ml-2 bg-orange-100 text-orange-800">
-                                Expiring Soon
-                              </Badge>
-                            )}
                           </TableCell>
-                          <TableCell>{item.expiry_date ? new Date(item.expiry_date).toLocaleDateString() : 'N/A'}</TableCell>
-                          <TableCell>{item.compliance_score || 'N/A'}</TableCell>
-                          <TableCell>
-                            <Button variant="outline" size="sm">
-                              <Eye className="h-4 w-4 mr-1" />
-                              Review
-                            </Button>
-                          </TableCell>
+                          <TableCell>{new Date(admin.created_at).toLocaleDateString()}</TableCell>
                         </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Analytics & Reporting */}
-          <TabsContent value="analytics-reporting">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Analytics & Reporting
-                </CardTitle>
-                <CardDescription>Real-time insights and performance metrics</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                  <div className="text-center p-6 bg-blue-50 rounded-lg">
-                    <h3 className="text-lg font-semibold text-blue-900">Registration Completion Rate</h3>
-                    <p className="text-3xl font-bold text-blue-600 mt-2">
-                      {vendors.length > 0 ? Math.round((vendors.filter(v => v.calculated_status === 'approved').length / vendors.length) * 100) : 0}%
-                    </p>
-                    <p className="text-blue-700 mt-1">Approved/Total</p>
-                  </div>
-                  <div className="text-center p-6 bg-green-50 rounded-lg">
-                    <h3 className="text-lg font-semibold text-green-900">Compliance Rate</h3>
-                    <p className="text-3xl font-bold text-green-600 mt-2">
-                      {compliance.length > 0 ? Math.round((compliance.filter(c => c.status === 'approved').length / compliance.length) * 100) : 0}%
-                    </p>
-                    <p className="text-green-700 mt-1">Compliant/Total</p>
-                  </div>
-                  <div className="text-center p-6 bg-purple-50 rounded-lg">
-                    <h3 className="text-lg font-semibold text-purple-900">Document Processing</h3>
-                    <p className="text-3xl font-bold text-purple-600 mt-2">
-                      {documents.length > 0 ? Math.round((documents.filter(d => d.status === 'active').length / documents.length) * 100) : 0}%
-                    </p>
-                    <p className="text-purple-700 mt-1">Active/Total</p>
-                  </div>
-                </div>
-                <div className="flex gap-4">
-                  <Button onClick={exportVendorData} className="flex items-center gap-2">
-                    <Download className="h-4 w-4" />
-                    Export Analytics Report
-                  </Button>
-                  <Button variant="outline" className="flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4" />
-                    Generate Custom Report
-                  </Button>
+                      ))}
+                    </TableBody>
+                  </Table>
                 </div>
               </CardContent>
             </Card>
           </TabsContent>
 
-          {/* Audit & Notifications */}
-          <TabsContent value="audit-notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Bell className="h-5 w-5" />
-                  Audit & Notifications
-                </CardTitle>
-                <CardDescription>Real-time system activity monitoring and alert management</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Recent System Activities ({auditLogs.length} total)</h3>
+          {/* Documents */}
+          <TabsContent value="documents">
+            <div className="space-y-6">
+              <DocumentUpload onUploadComplete={fetchDashboardData} />
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Documents</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Timestamp</TableHead>
-                          <TableHead>Action</TableHead>
-                          <TableHead>Entity</TableHead>
+                          <TableHead>Document Name</TableHead>
+                          <TableHead>Type</TableHead>
                           <TableHead>Vendor ID</TableHead>
-                          <TableHead>Details</TableHead>
+                          <TableHead>Size</TableHead>
+                          <TableHead>Uploaded By</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {auditLogs.slice(0, 10).map((log) => (
-                          <TableRow key={log.id}>
-                            <TableCell>{new Date(log.timestamp).toLocaleString()}</TableCell>
+                        {documents.slice(0, 10).map((doc) => (
+                          <TableRow key={doc.id}>
+                            <TableCell className="font-medium">{doc.document_name}</TableCell>
                             <TableCell>
-                              <Badge className={
-                                log.action === 'CREATE' ? 'bg-green-100 text-green-800' :
-                                log.action === 'UPDATE' ? 'bg-blue-100 text-blue-800' :
-                                log.action === 'DELETE' ? 'bg-red-100 text-red-800' :
-                                log.action === 'APPROVE' ? 'bg-green-100 text-green-800' :
-                                log.action === 'REJECT' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
-                              }>
-                                {log.action}
+                              <Badge variant="outline">{doc.document_type}</Badge>
+                            </TableCell>
+                            <TableCell className="font-mono text-sm">{doc.vendor_id}</TableCell>
+                            <TableCell>{doc.file_size ? `${(doc.file_size / 1024 / 1024).toFixed(2)} MB` : 'N/A'}</TableCell>
+                            <TableCell>{doc.uploaded_by}</TableCell>
+                            <TableCell>
+                              <Badge variant={doc.status === 'active' ? 'default' : 'secondary'}>
+                                {doc.status}
                               </Badge>
                             </TableCell>
-                            <TableCell className="capitalize">{log.entity_type}</TableCell>
-                            <TableCell className="font-mono text-sm">{log.vendor_id || 'N/A'}</TableCell>
-                            <TableCell className="max-w-xs truncate">
-                              {log.new_values ? JSON.stringify(log.new_values).substring(0, 50) + '...' : 'N/A'}
-                            </TableCell>
+                            <TableCell>{new Date(doc.upload_date).toLocaleDateString()}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Compliance */}
+          <TabsContent value="compliance">
+            <Card>
+              <CardHeader>
+                <CardTitle>Compliance Tracking</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center p-6 bg-green-50 rounded-lg">
+                    <CheckCircle className="h-12 w-12 text-green-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-green-900">Compliant</h3>
+                    <p className="text-3xl font-bold text-green-600">{stats.activeVendors}</p>
+                    <p className="text-sm text-green-700">Vendors meeting all requirements</p>
                   </div>
                   
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Active Notifications ({notifications.filter(n => !n.is_read).length} unread of {notifications.length} total)</h3>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Title</TableHead>
-                          <TableHead>Message</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Priority</TableHead>
-                          <TableHead>Vendor ID</TableHead>
-                          <TableHead>Created</TableHead>
-                          <TableHead>Status</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {notifications.slice(0, 10).map((notification) => (
-                          <TableRow key={notification.id} className={!notification.is_read ? 'bg-blue-50' : ''}>
-                            <TableCell className="font-medium">{notification.title}</TableCell>
-                            <TableCell className="max-w-xs truncate">{notification.message}</TableCell>
-                            <TableCell className="capitalize">{notification.notification_type}</TableCell>
-                            <TableCell>
-                              <Badge className={
-                                notification.priority === 'high' ? 'bg-red-100 text-red-800' :
-                                notification.priority === 'medium' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-blue-100 text-blue-800'
-                              }>
-                                {notification.priority}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="font-mono text-sm">{notification.vendor_id || 'N/A'}</TableCell>
-                            <TableCell>{new Date(notification.created_at).toLocaleDateString()}</TableCell>
-                            <TableCell>
-                              <Badge className={notification.is_read ? 'bg-gray-100 text-gray-800' : 'bg-green-100 text-green-800'}>
-                                {notification.is_read ? 'Read' : 'Unread'}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+                  <div className="text-center p-6 bg-yellow-50 rounded-lg">
+                    <AlertTriangle className="h-12 w-12 text-yellow-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-yellow-900">Pending Review</h3>
+                    <p className="text-3xl font-bold text-yellow-600">{Math.floor(stats.pendingVendors / 2)}</p>
+                    <p className="text-sm text-yellow-700">Vendors awaiting compliance check</p>
                   </div>
+                  
+                  <div className="text-center p-6 bg-red-50 rounded-lg">
+                    <XCircle className="h-12 w-12 text-red-600 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-red-900">Non-Compliant</h3>
+                    <p className="text-3xl font-bold text-red-600">{Math.ceil(stats.pendingVendors / 2)}</p>
+                    <p className="text-sm text-red-700">Vendors requiring attention</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Notifications */}
+          <TabsContent value="notifications">
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent Notifications</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {notifications.map((notification) => (
+                    <div key={notification.id} className={`p-4 rounded-lg border ${notification.is_read ? 'bg-gray-50' : 'bg-blue-50 border-blue-200'}`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Bell className="h-4 w-4 text-gray-500" />
+                            <h4 className="font-medium text-gray-900">{notification.title}</h4>
+                            <Badge variant={notification.priority === 'high' ? 'destructive' : notification.priority === 'medium' ? 'default' : 'secondary'}>
+                              {notification.priority}
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600">{notification.message}</p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {new Date(notification.created_at).toLocaleString()}
+                            {notification.vendor_id && ` • Vendor: ${notification.vendor_id}`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </CardContent>
             </Card>
