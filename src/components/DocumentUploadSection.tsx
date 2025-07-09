@@ -14,7 +14,7 @@ interface UploadedDocument {
   document_type: string;
   document_name: string;
   file_path: string;
-  document_url: string;
+  document_url?: string | null;
   upload_date: string;
   status: string;
 }

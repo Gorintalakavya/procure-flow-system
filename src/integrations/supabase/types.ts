@@ -243,6 +243,7 @@ export type Database = {
         Row: {
           document_name: string
           document_type: string
+          document_url: string | null
           expiry_date: string | null
           file_path: string | null
           file_size: number | null
@@ -257,6 +258,7 @@ export type Database = {
         Insert: {
           document_name: string
           document_type: string
+          document_url?: string | null
           expiry_date?: string | null
           file_path?: string | null
           file_size?: number | null
@@ -271,6 +273,7 @@ export type Database = {
         Update: {
           document_name?: string
           document_type?: string
+          document_url?: string | null
           expiry_date?: string | null
           file_path?: string | null
           file_size?: number | null
@@ -465,6 +468,99 @@ export type Database = {
             referencedColumns: ["vendor_id"]
           },
         ]
+      }
+      vendor_drafts: {
+        Row: {
+          annual_revenue: string | null
+          bank_account_details: string | null
+          business_description: string | null
+          city: string | null
+          contact_name: string | null
+          country: string | null
+          created_at: string | null
+          currency: string | null
+          custom_country: string | null
+          email: string | null
+          employee_count: string | null
+          id: string
+          legal_entity_name: string | null
+          payment_terms: string | null
+          phone_number: string | null
+          postal_code: string | null
+          products_services_description: string | null
+          registration_status: string | null
+          state: string | null
+          street_address: string | null
+          street_address_line2: string | null
+          tax_id: string | null
+          trade_name: string | null
+          updated_at: string | null
+          vat_id: string | null
+          vendor_type: string | null
+          website: string | null
+          year_established: string | null
+        }
+        Insert: {
+          annual_revenue?: string | null
+          bank_account_details?: string | null
+          business_description?: string | null
+          city?: string | null
+          contact_name?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          custom_country?: string | null
+          email?: string | null
+          employee_count?: string | null
+          id?: string
+          legal_entity_name?: string | null
+          payment_terms?: string | null
+          phone_number?: string | null
+          postal_code?: string | null
+          products_services_description?: string | null
+          registration_status?: string | null
+          state?: string | null
+          street_address?: string | null
+          street_address_line2?: string | null
+          tax_id?: string | null
+          trade_name?: string | null
+          updated_at?: string | null
+          vat_id?: string | null
+          vendor_type?: string | null
+          website?: string | null
+          year_established?: string | null
+        }
+        Update: {
+          annual_revenue?: string | null
+          bank_account_details?: string | null
+          business_description?: string | null
+          city?: string | null
+          contact_name?: string | null
+          country?: string | null
+          created_at?: string | null
+          currency?: string | null
+          custom_country?: string | null
+          email?: string | null
+          employee_count?: string | null
+          id?: string
+          legal_entity_name?: string | null
+          payment_terms?: string | null
+          phone_number?: string | null
+          postal_code?: string | null
+          products_services_description?: string | null
+          registration_status?: string | null
+          state?: string | null
+          street_address?: string | null
+          street_address_line2?: string | null
+          tax_id?: string | null
+          trade_name?: string | null
+          updated_at?: string | null
+          vat_id?: string | null
+          vendor_type?: string | null
+          website?: string | null
+          year_established?: string | null
+        }
+        Relationships: []
       }
       vendor_profiles: {
         Row: {
