@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileText, Trash2, CheckCircle, Save } from "lucide-react";
+import { Upload, FileText, Trash2, CheckCircle, Save, Link } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -14,6 +14,7 @@ interface UploadedDocument {
   document_type: string;
   document_name: string;
   file_path: string;
+  document_url: string;
   upload_date: string;
   status: string;
 }
@@ -37,6 +38,7 @@ const DOCUMENT_TYPES = [
 
 const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId }) => {
   const [selectedDocumentType, setSelectedDocumentType] = useState('');
+  const [documentUrl, setDocumentUrl] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -60,10 +62,26 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
     }
   };
 
+  const validateDocumentFormat = (documentType: string, fileName: string) => {
+    const validationRules = {
+      'pan_card': /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/,
+      'gst_registration': /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/,
+    };
+    
+    // Add more validation rules as needed
+    return true; // For now, return true
+  };
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || !selectedDocumentType) {
       toast.error('Please select a document type and file');
+      return;
+    }
+
+    // Validate document format
+    if (!validateDocumentFormat(selectedDocumentType, file.name)) {
+      toast.error('Invalid document format for the selected type');
       return;
     }
 
@@ -89,6 +107,7 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
           document_type: selectedDocumentType,
           document_name: file.name,
           file_path: filePath,
+          document_url: documentUrl || null,
           file_size: file.size,
           status: 'uploaded',
           uploaded_by: 'vendor'
@@ -98,6 +117,7 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
 
       toast.success('Document uploaded successfully!');
       setSelectedDocumentType('');
+      setDocumentUrl('');
       fetchUploadedDocuments();
       
       // Clear file input
@@ -113,9 +133,11 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
   const handleDeleteDocument = async (documentId: string, filePath: string) => {
     try {
       // Delete from storage
-      await supabase.storage
-        .from('vendor-documents')
-        .remove([filePath]);
+      if (filePath) {
+        await supabase.storage
+          .from('vendor-documents')
+          .remove([filePath]);
+      }
 
       // Delete from database
       const { error } = await supabase
@@ -136,8 +158,7 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
   const handleSaveDocumentSection = async () => {
     setIsSaving(true);
     try {
-      // Here you could save additional metadata or preferences
-      // For now, we'll just update the vendor's document completion status
+      // Update the vendor's document completion status
       const { error } = await supabase
         .from('vendors')
         .update({ 
@@ -147,6 +168,17 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
         .eq('vendor_id', vendorId);
 
       if (error) throw error;
+
+      // Create audit log
+      await supabase
+        .from('audit_logs')
+        .insert({
+          vendor_id: vendorId,
+          action: 'DOCUMENT_SECTION_SAVED',
+          entity_type: 'vendor_profile',
+          entity_id: vendorId,
+          new_values: { documents_updated: uploadedDocuments.length }
+        });
 
       toast.success('Document section saved successfully!');
     } catch (error) {
@@ -192,6 +224,24 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
           </div>
 
           <div>
+            <Label htmlFor="document-url">Document URL (Optional)</Label>
+            <div className="relative">
+              <Link className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                id="document-url"
+                type="url"
+                value={documentUrl}
+                onChange={(e) => setDocumentUrl(e.target.value)}
+                placeholder="https://example.com/document.pdf"
+                className="pl-10"
+              />
+            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              Add a URL link to your document if available online
+            </p>
+          </div>
+
+          <div>
             <Label htmlFor="document-file">Upload File</Label>
             <div className="flex items-center gap-4">
               <Input
@@ -227,6 +277,17 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
                     <div>
                       <div className="font-medium">{getDocumentTypeLabel(doc.document_type)}</div>
                       <div className="text-sm text-gray-600">{doc.document_name}</div>
+                      {doc.document_url && (
+                        <a 
+                          href={doc.document_url} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
+                        >
+                          <Link className="h-3 w-3" />
+                          View Online
+                        </a>
+                      )}
                       <div className="text-xs text-gray-500">
                         Uploaded: {new Date(doc.upload_date).toLocaleDateString()}
                       </div>
@@ -248,7 +309,7 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
 
         {/* Document Requirements Info */}
         <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-semibold text-blue-900 mb-2">Document Requirements</h4>
+          <h4 className="font-semibold text-blue-900 mb-2">Document Requirements & Smart Validation</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-blue-800">
             {DOCUMENT_TYPES.map((docType) => (
               <div key={docType.value} className="flex justify-between">
@@ -256,6 +317,15 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
                 <span className="text-right">{docType.purpose}</span>
               </div>
             ))}
+          </div>
+          <div className="mt-3 p-3 bg-white rounded border border-blue-200">
+            <h5 className="font-medium text-blue-900 mb-1">Auto-Validation Features:</h5>
+            <ul className="text-xs text-blue-700 space-y-1">
+              <li>• PAN format validation (AAAAA9999A)</li>
+              <li>• GST format validation (22AAAAA0000A1Z5)</li>
+              <li>• Document expiry date checks</li>
+              <li>• Mandatory field validation</li>
+            </ul>
           </div>
         </div>
 

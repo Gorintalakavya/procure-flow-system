@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Building2, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,8 @@ const VendorAuth = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [pendingVendor, setPendingVendor] = useState<any>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -52,12 +54,14 @@ const VendorAuth = () => {
 
       if (error) {
         console.error('Error sending confirmation email:', error);
+        toast.error('Failed to send confirmation email');
       } else {
         console.log('Confirmation email sent successfully');
-        toast.success('Confirmation email sent!');
+        toast.success('Confirmation email sent to your email address!');
       }
     } catch (error) {
       console.error('Error invoking email function:', error);
+      toast.error('Failed to send confirmation email');
     }
   };
 
@@ -164,7 +168,7 @@ const VendorAuth = () => {
       }));
 
       await sendConfirmationEmail(newUser.email, newUser.vendor_id || '', 'signup');
-      toast.success('Account created successfully!');
+      toast.success('Account created successfully! Confirmation email sent.');
       localStorage.removeItem('pendingVendor');
       navigate('/vendor-profile');
 
@@ -185,7 +189,19 @@ const VendorAuth = () => {
 
     setIsLoading(true);
     try {
-      await sendConfirmationEmail(forgotPasswordEmail, '', 'forgot-password');
+      // Check if user exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('email, vendor_id')
+        .eq('email', forgotPasswordEmail)
+        .single();
+
+      if (!existingUser) {
+        toast.error('No account found with this email address');
+        return;
+      }
+
+      await sendConfirmationEmail(forgotPasswordEmail, existingUser.vendor_id || '', 'forgot-password');
       toast.success('Password reset instructions sent to your email');
       setForgotPasswordEmail('');
     } catch (error) {
@@ -282,14 +298,21 @@ const VendorAuth = () => {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="signup-password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         value={signupData.password}
                         onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
                         placeholder="Create a password (min 6 characters)"
-                        className="pl-10"
+                        className="pl-10 pr-10"
                         required
                         minLength={6}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -299,14 +322,21 @@ const VendorAuth = () => {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="signup-confirm-password"
-                        type="password"
+                        type={showConfirmPassword ? "text" : "password"}
                         value={signupData.confirmPassword}
                         onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                         placeholder="Confirm your password"
-                        className="pl-10"
+                        className="pl-10 pr-10"
                         required
                         minLength={6}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
 
@@ -344,13 +374,20 @@ const VendorAuth = () => {
                       <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                       <Input
                         id="signin-password"
-                        type="password"
+                        type={showPassword ? "text" : "password"}
                         value={loginData.password}
                         onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
                         placeholder="Enter your password"
-                        className="pl-10"
+                        className="pl-10 pr-10"
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
                     </div>
                   </div>
 
