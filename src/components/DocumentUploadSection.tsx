@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileText, Trash2, CheckCircle } from "lucide-react";
+import { Upload, FileText, Trash2, CheckCircle, Save } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -39,6 +39,7 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
   const [selectedDocumentType, setSelectedDocumentType] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
 
   React.useEffect(() => {
     fetchUploadedDocuments();
@@ -129,6 +130,30 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
     } catch (error) {
       console.error('Error deleting document:', error);
       toast.error('Failed to delete document');
+    }
+  };
+
+  const handleSaveDocumentSection = async () => {
+    setIsSaving(true);
+    try {
+      // Here you could save additional metadata or preferences
+      // For now, we'll just update the vendor's document completion status
+      const { error } = await supabase
+        .from('vendors')
+        .update({ 
+          updated_at: new Date().toISOString(),
+          // You could add a field to track document section completion
+        })
+        .eq('vendor_id', vendorId);
+
+      if (error) throw error;
+
+      toast.success('Document section saved successfully!');
+    } catch (error) {
+      console.error('Error saving document section:', error);
+      toast.error('Failed to save document section');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -232,6 +257,27 @@ const DocumentUploadSection: React.FC<DocumentUploadSectionProps> = ({ vendorId 
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Save Section Button */}
+        <div className="flex justify-end pt-4 border-t">
+          <Button
+            onClick={handleSaveDocumentSection}
+            disabled={isSaving}
+            className="flex items-center gap-2"
+          >
+            {isSaving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                Saving...
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                Save Document Section
+              </>
+            )}
+          </Button>
         </div>
       </CardContent>
     </Card>

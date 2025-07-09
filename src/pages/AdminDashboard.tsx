@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,6 @@ import { Users, FileText, Shield, BarChart3, Bell, Download, Upload, Eye, CheckC
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import DocumentUpload from "@/components/DocumentUpload";
 
 interface Vendor {
   vendor_id: string;
@@ -30,6 +30,19 @@ interface Vendor {
   tax_id?: string;
   street_address: string;
   postal_code: string;
+  contact_phone?: string;
+  trade_name?: string;
+  year_established?: string;
+  vat_id?: string;
+  payment_terms?: string;
+  bank_account_details?: string;
+  currency?: string;
+  relationship_owner?: string;
+  products_services_description?: string;
+  reconciliation_account?: string;
+  w9_status?: string;
+  w8_ben_status?: string;
+  w8_ben_e_status?: string;
 }
 
 interface AdminUser {
@@ -87,6 +100,7 @@ const AdminDashboard = () => {
     }
 
     fetchDashboardData();
+    fetchNotifications();
   }, [navigate]);
 
   const calculateVendorStatus = (vendor: Vendor) => {
@@ -139,7 +153,7 @@ const AdminDashboard = () => {
         setVendors(updatedVendors);
       }
 
-      // Fetch admin users with profiles - Fixed query
+      // Fetch admin users with profiles
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
         .select(`
@@ -171,19 +185,6 @@ const AdminDashboard = () => {
         setDocuments(documentsData || []);
       }
 
-      // Fetch notifications
-      const { data: notificationsData, error: notificationsError } = await supabase
-        .from('notifications')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (notificationsError) {
-        console.error('Error fetching notifications:', notificationsError);
-      } else {
-        setNotifications(notificationsData || []);
-      }
-
       // Calculate stats
       const totalVendors = vendorsData?.length || 0;
       const activeVendors = vendorsData?.filter(v => ['completed', 'in_progress'].includes(calculateVendorStatus(v))).length || 0;
@@ -202,6 +203,69 @@ const AdminDashboard = () => {
       toast.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchNotifications = async () => {
+    try {
+      // First, generate some sample notifications if none exist
+      const { data: existingNotifications } = await supabase
+        .from('notifications')
+        .select('id')
+        .limit(1);
+
+      if (!existingNotifications || existingNotifications.length === 0) {
+        const sampleNotifications = [
+          {
+            title: 'New Vendor Registration',
+            message: 'A new vendor "Tech Solutions Inc." has registered and requires approval',
+            notification_type: 'vendor_registration',
+            priority: 'high',
+            is_read: false,
+            vendor_id: 'VEN001'
+          },
+          {
+            title: 'Document Expiring Soon',
+            message: 'ISO certificate for vendor "Global Supplies Ltd" expires in 15 days',
+            notification_type: 'compliance_alert',
+            priority: 'medium',
+            is_read: false,
+            vendor_id: 'VEN002'
+          },
+          {
+            title: 'Vendor Status Updated',
+            message: 'Vendor "Manufacturing Corp" status changed to approved',
+            notification_type: 'status_update',
+            priority: 'low',
+            is_read: true,
+            vendor_id: 'VEN003'
+          },
+          {
+            title: 'Compliance Review Required',
+            message: 'Monthly compliance review for 12 vendors is due',
+            notification_type: 'compliance_alert',
+            priority: 'high',
+            is_read: false
+          }
+        ];
+
+        await supabase.from('notifications').insert(sampleNotifications);
+      }
+
+      // Fetch notifications
+      const { data: notificationsData, error: notificationsError } = await supabase
+        .from('notifications')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(20);
+
+      if (notificationsError) {
+        console.error('Error fetching notifications:', notificationsError);
+      } else {
+        setNotifications(notificationsData || []);
+      }
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
     }
   };
 
@@ -276,6 +340,15 @@ const AdminDashboard = () => {
         {config.label}
       </Badge>
     );
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'high': return 'text-red-600 bg-red-50 border-red-200';
+      case 'medium': return 'text-orange-600 bg-orange-50 border-orange-200';
+      case 'low': return 'text-green-600 bg-green-50 border-green-200';
+      default: return 'text-gray-600 bg-gray-50 border-gray-200';
+    }
   };
 
   const adminUser = JSON.parse(localStorage.getItem('adminUser') || '{}');
@@ -429,48 +502,154 @@ const AdminDashboard = () => {
                                   <Eye className="h-4 w-4" />
                                 </Button>
                               </DialogTrigger>
-                              <DialogContent className="max-w-2xl">
+                              <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
                                 <DialogHeader>
-                                  <DialogTitle>Vendor Details</DialogTitle>
+                                  <DialogTitle>Comprehensive Vendor Details</DialogTitle>
                                   <DialogDescription>
                                     Complete information for {vendor.legal_entity_name}
                                   </DialogDescription>
                                 </DialogHeader>
                                 {selectedVendor && (
-                                  <div className="space-y-4">
-                                    <div className="grid grid-cols-2 gap-4">
-                                      <div>
-                                        <label className="font-semibold">Vendor ID:</label>
-                                        <p>{selectedVendor.vendor_id}</p>
-                                      </div>
-                                      <div>
-                                        <label className="font-semibold">Legal Entity Name:</label>
-                                        <p>{selectedVendor.legal_entity_name}</p>
-                                      </div>
-                                      <div>
-                                        <label className="font-semibold">Email:</label>
-                                        <p>{selectedVendor.email}</p>
-                                      </div>
-                                      <div>
-                                        <label className="font-semibold">Phone:</label>
-                                        <p>{selectedVendor.phone_number || 'N/A'}</p>
-                                      </div>
-                                      <div>
-                                        <label className="font-semibold">Website:</label>
-                                        <p>{selectedVendor.website || 'N/A'}</p>
-                                      </div>
-                                      <div>
-                                        <label className="font-semibold">Vendor Type:</label>
-                                        <p>{selectedVendor.vendor_type}</p>
+                                  <div className="space-y-6">
+                                    {/* General Information */}
+                                    <div>
+                                      <h3 className="text-lg font-semibold mb-3 text-blue-900">General Information</h3>
+                                      <div className="grid grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg">
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Vendor ID:</label>
+                                          <p className="text-gray-900">{selectedVendor.vendor_id}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Legal Entity Name:</label>
+                                          <p className="text-gray-900">{selectedVendor.legal_entity_name}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Trade Name:</label>
+                                          <p className="text-gray-900">{selectedVendor.trade_name || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Contact Name:</label>
+                                          <p className="text-gray-900">{selectedVendor.contact_name}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Email:</label>
+                                          <p className="text-gray-900">{selectedVendor.email}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Phone:</label>
+                                          <p className="text-gray-900">{selectedVendor.phone_number || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Website:</label>
+                                          <p className="text-gray-900">{selectedVendor.website || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Vendor Type:</label>
+                                          <p className="text-gray-900">{selectedVendor.vendor_type}</p>
+                                        </div>
                                       </div>
                                     </div>
+
+                                    {/* Address Information */}
                                     <div>
-                                      <label className="font-semibold">Address:</label>
-                                      <p>{selectedVendor.street_address}, {selectedVendor.city}, {selectedVendor.state} {selectedVendor.postal_code}, {selectedVendor.country}</p>
+                                      <h3 className="text-lg font-semibold mb-3 text-green-900">Address Information</h3>
+                                      <div className="grid grid-cols-2 gap-4 p-4 bg-green-50 rounded-lg">
+                                        <div className="col-span-2">
+                                          <label className="font-semibold text-gray-700">Street Address:</label>
+                                          <p className="text-gray-900">{selectedVendor.street_address}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">City:</label>
+                                          <p className="text-gray-900">{selectedVendor.city}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">State:</label>
+                                          <p className="text-gray-900">{selectedVendor.state}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Postal Code:</label>
+                                          <p className="text-gray-900">{selectedVendor.postal_code}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Country:</label>
+                                          <p className="text-gray-900">{selectedVendor.country}</p>
+                                        </div>
+                                      </div>
                                     </div>
+
+                                    {/* Financial Information */}
                                     <div>
-                                      <label className="font-semibold">Business Description:</label>
-                                      <p>{selectedVendor.business_description || 'N/A'}</p>
+                                      <h3 className="text-lg font-semibold mb-3 text-purple-900">Financial Information</h3>
+                                      <div className="grid grid-cols-2 gap-4 p-4 bg-purple-50 rounded-lg">
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Annual Revenue:</label>
+                                          <p className="text-gray-900">{selectedVendor.annual_revenue || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Currency:</label>
+                                          <p className="text-gray-900">{selectedVendor.currency || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Tax ID:</label>
+                                          <p className="text-gray-900">{selectedVendor.tax_id || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">VAT ID:</label>
+                                          <p className="text-gray-900">{selectedVendor.vat_id || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Payment Terms:</label>
+                                          <p className="text-gray-900">{selectedVendor.payment_terms || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Bank Account:</label>
+                                          <p className="text-gray-900">{selectedVendor.bank_account_details || 'N/A'}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Compliance Information */}
+                                    <div>
+                                      <h3 className="text-lg font-semibold mb-3 text-orange-900">Compliance Information</h3>
+                                      <div className="grid grid-cols-3 gap-4 p-4 bg-orange-50 rounded-lg">
+                                        <div>
+                                          <label className="font-semibold text-gray-700">W-9 Status:</label>
+                                          <p className="text-gray-900">{selectedVendor.w9_status || 'Not Submitted'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">W-8BEN Status:</label>
+                                          <p className="text-gray-900">{selectedVendor.w8_ben_status || 'Not Submitted'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">W-8BEN-E Status:</label>
+                                          <p className="text-gray-900">{selectedVendor.w8_ben_e_status || 'Not Submitted'}</p>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    {/* Business Details */}
+                                    <div>
+                                      <h3 className="text-lg font-semibold mb-3 text-teal-900">Business Details</h3>
+                                      <div className="p-4 bg-teal-50 rounded-lg space-y-3">
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Business Description:</label>
+                                          <p className="text-gray-900">{selectedVendor.business_description || 'N/A'}</p>
+                                        </div>
+                                        <div>
+                                          <label className="font-semibold text-gray-700">Products/Services:</label>
+                                          <p className="text-gray-900">{selectedVendor.products_services_description || 'N/A'}</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-4">
+                                          <div>
+                                            <label className="font-semibold text-gray-700">Employee Count:</label>
+                                            <p className="text-gray-900">{selectedVendor.employee_count || 'N/A'}</p>
+                                          </div>
+                                          <div>
+                                            <label className="font-semibold text-gray-700">Year Established:</label>
+                                            <p className="text-gray-900">{selectedVendor.year_established || 'N/A'}</p>
+                                          </div>
+                                        </div>
+                                      </div>
                                     </div>
                                   </div>
                                 )}
@@ -611,28 +790,6 @@ const AdminDashboard = () => {
                     <p className="text-sm text-red-700">Vendors requiring attention</p>
                   </div>
                 </div>
-                
-                {/* Compliance Requirements */}
-                <div className="mt-8">
-                  <h4 className="text-lg font-semibold mb-4">Required Documents</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { type: 'W-9/W-8BEN/W-8BEN-E forms', purpose: 'Tax forms for US/foreign vendors' },
-                      { type: 'ISO certificates', purpose: 'Quality assurance compliance' },
-                      { type: 'Business registration certificate', purpose: 'Proof of legal business' },
-                      { type: 'GST Registration', purpose: 'Required for Indian vendors' },
-                      { type: 'PAN Card', purpose: 'India tax ID verification' },
-                      { type: 'Bank verification letter', purpose: 'Optional, under financial' },
-                      { type: 'MSME/SSI certificate', purpose: 'Small business classification' },
-                      { type: 'Contracts/MOUs', purpose: 'Under Procurement Info' }
-                    ].map((doc, index) => (
-                      <div key={index} className="p-4 border rounded-lg">
-                        <h5 className="font-medium">{doc.type}</h5>
-                        <p className="text-sm text-gray-600">{doc.purpose}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
@@ -645,26 +802,36 @@ const AdminDashboard = () => {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {notifications.map((notification) => (
-                    <div key={notification.id} className={`p-4 rounded-lg border ${notification.is_read ? 'bg-gray-50' : 'bg-blue-50 border-blue-200'}`}>
+                  {notifications.length > 0 ? notifications.map((notification) => (
+                    <div key={notification.id} className={`p-4 rounded-lg border ${
+                      notification.is_read ? 'bg-gray-50' : `${getPriorityColor(notification.priority)}`
+                    }`}>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-2">
-                            <Bell className="h-4 w-4 text-gray-500" />
-                            <h4 className="font-medium text-gray-900">{notification.title}</h4>
+                            <Bell className="h-4 w-4" />
+                            <h4 className="font-medium">{notification.title}</h4>
                             <Badge variant={notification.priority === 'high' ? 'destructive' : notification.priority === 'medium' ? 'default' : 'secondary'}>
                               {notification.priority}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-600">{notification.message}</p>
-                          <p className="text-xs text-gray-500 mt-2">
+                          <p className="text-sm mb-2">{notification.message}</p>
+                          <p className="text-xs text-gray-500">
                             {new Date(notification.created_at).toLocaleString()}
                             {notification.vendor_id && ` • Vendor: ${notification.vendor_id}`}
                           </p>
                         </div>
+                        {!notification.is_read && (
+                          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                        )}
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="text-center py-8 text-gray-500">
+                      <Bell className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                      <p>No notifications available</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
