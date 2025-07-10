@@ -23,202 +23,6 @@ const PublicVendorDirectory = () => {
     yearEstablished: 'all'
   });
 
-  // Extended mock data with more diverse vendors
-  const mockVendors = [
-    {
-      id: '1',
-      vendor_id: 'VND-001',
-      legal_entity_name: 'TechCorp Solutions',
-      trade_name: 'TechCorp',
-      vendor_type: 'technology',
-      year_established: '2015',
-      business_description: 'Leading provider of enterprise software solutions and digital transformation services.',
-      products_services_description: 'Custom software development, cloud migration, AI/ML consulting, cybersecurity services',
-      city: 'Bangalore',
-      state: 'Karnataka',
-      country: 'India',
-      website: 'www.techcorp.com',
-      phone_number: '+91-9876543210',
-      registration_status: 'approved'
-    },
-    {
-      id: '2',
-      vendor_id: 'VND-002',
-      legal_entity_name: 'Global Manufacturing Inc',
-      trade_name: null,
-      vendor_type: 'manufacturing',
-      year_established: '2008',
-      business_description: 'International manufacturing company specializing in automotive parts and components.',
-      products_services_description: 'Automotive parts manufacturing, quality assurance, supply chain management',
-      city: 'Detroit',
-      state: 'Michigan',
-      country: 'USA',
-      website: 'www.globalmanufacturing.com',
-      phone_number: '+1-555-123-4567',
-      registration_status: 'approved'
-    },
-    {
-      id: '3',
-      vendor_id: 'VND-003',
-      legal_entity_name: 'EcoGreen Services',
-      trade_name: 'EcoGreen',
-      vendor_type: 'services',
-      year_established: '2020',
-      business_description: 'Environmental consulting and sustainability services provider.',
-      products_services_description: 'Environmental impact assessment, sustainability consulting, waste management',
-      city: 'London',
-      state: 'England',
-      country: 'UK',
-      website: 'www.ecogreen.co.uk',
-      phone_number: '+44-20-7123-4567',
-      registration_status: 'approved'
-    },
-    {
-      id: '4',
-      vendor_id: 'VND-004',
-      legal_entity_name: 'Healthcare Innovations Ltd',
-      trade_name: 'HealthTech',
-      vendor_type: 'healthcare',
-      year_established: '2018',
-      business_description: 'Medical device manufacturer and healthcare technology solutions provider.',
-      products_services_description: 'Medical devices, healthcare software, telemedicine solutions, clinical research',
-      city: 'Toronto',
-      state: 'Ontario',
-      country: 'Canada',
-      website: 'www.healthtech.ca',
-      phone_number: '+1-416-555-9876',
-      registration_status: 'approved'
-    },
-    {
-      id: '5',
-      vendor_id: 'VND-005',
-      legal_entity_name: 'Digital Marketing Pro',
-      trade_name: 'DigiPro',
-      vendor_type: 'marketing',
-      year_established: '2019',
-      business_description: 'Full-service digital marketing agency specializing in online brand development.',
-      products_services_description: 'SEO services, social media marketing, content creation, PPC advertising',
-      city: 'Sydney',
-      state: 'NSW',
-      country: 'Australia',
-      website: 'www.digipro.com.au',
-      phone_number: '+61-2-9876-5432',
-      registration_status: 'approved'
-    },
-    {
-      id: '6',
-      vendor_id: 'VND-006',
-      legal_entity_name: 'Financial Consultants Group',
-      trade_name: 'FinCon',
-      vendor_type: 'consulting',
-      year_established: '2012',
-      business_description: 'Premier financial advisory and consulting services for businesses and individuals.',
-      products_services_description: 'Financial planning, tax consulting, audit services, investment advisory',
-      city: 'Mumbai',
-      state: 'Maharashtra',
-      country: 'India',
-      website: 'www.fincon.in',
-      phone_number: '+91-22-1234-5678',
-      registration_status: 'approved'
-    },
-    {
-      id: '7',
-      vendor_id: 'VND-007',
-      legal_entity_name: 'Construction Masters Ltd',
-      trade_name: 'BuildPro',
-      vendor_type: 'construction',
-      year_established: '2010',
-      business_description: 'Large-scale construction and infrastructure development company.',
-      products_services_description: 'Commercial construction, residential projects, infrastructure development',
-      city: 'Dubai',
-      state: 'Dubai',
-      country: 'UAE',
-      website: 'www.buildpro.ae',
-      phone_number: '+971-4-123-4567',
-      registration_status: 'approved'
-    },
-    {
-      id: '8',
-      vendor_id: 'VND-008',
-      legal_entity_name: 'Food & Beverage Solutions',
-      trade_name: 'FoodTech',
-      vendor_type: 'food',
-      year_established: '2016',
-      business_description: 'Food processing and beverage manufacturing solutions provider.',
-      products_services_description: 'Food processing equipment, beverage systems, quality control solutions',
-      city: 'Singapore',
-      state: 'Singapore',
-      country: 'Singapore',
-      website: 'www.foodtech.sg',
-      phone_number: '+65-6123-4567',
-      registration_status: 'approved'
-    },
-    {
-      id: '9',
-      vendor_id: 'VND-009',
-      legal_entity_name: 'Logistics Excellence Corp',
-      trade_name: 'LogiEx',
-      vendor_type: 'logistics',
-      year_established: '2013',
-      business_description: 'Comprehensive logistics and supply chain management services.',
-      products_services_description: 'Freight forwarding, warehousing, distribution, supply chain optimization',
-      city: 'Rotterdam',
-      state: 'South Holland',
-      country: 'Netherlands',
-      website: 'www.logiex.nl',
-      phone_number: '+31-10-123-4567',
-      registration_status: 'approved'
-    },
-    {
-      id: '10',
-      vendor_id: 'VND-010',
-      legal_entity_name: 'Education Technology Hub',
-      trade_name: 'EduTech',
-      vendor_type: 'education',
-      year_established: '2021',
-      business_description: 'Educational technology solutions and e-learning platform provider.',
-      products_services_description: 'E-learning platforms, educational software, virtual classroom solutions',
-      city: 'Berlin',
-      state: 'Berlin',
-      country: 'Germany',
-      website: 'www.edutech.de',
-      phone_number: '+49-30-123-4567',
-      registration_status: 'approved'
-    },
-    {
-      id: '11',
-      vendor_id: 'VND-011',
-      legal_entity_name: 'Renewable Energy Systems',
-      trade_name: 'GreenPower',
-      vendor_type: 'energy',
-      year_established: '2017',
-      business_description: 'Solar and wind energy solutions for commercial and residential projects.',
-      products_services_description: 'Solar panel installation, wind turbines, energy storage systems',
-      city: 'San Francisco',
-      state: 'California',
-      country: 'USA',
-      website: 'www.greenpower.com',
-      phone_number: '+1-415-555-7890',
-      registration_status: 'approved'
-    },
-    {
-      id: '12',
-      vendor_id: 'VND-012',
-      legal_entity_name: 'Security Solutions International',
-      trade_name: 'SecureGuard',
-      vendor_type: 'security',
-      year_established: '2014',
-      business_description: 'Comprehensive security solutions for enterprises and government organizations.',
-      products_services_description: 'Security systems, surveillance equipment, access control, cybersecurity',
-      city: 'Tokyo',
-      state: 'Tokyo',
-      country: 'Japan',
-      website: 'www.secureguard.jp',
-      phone_number: '+81-3-1234-5678',
-      registration_status: 'approved'
-    }
-  ];
-
   useEffect(() => {
     fetchVerifiedVendors();
   }, []);
@@ -230,14 +34,45 @@ const PublicVendorDirectory = () => {
   const fetchVerifiedVendors = async () => {
     try {
       setIsLoading(true);
-      // For now, use mock data since we need more diverse vendor data
-      setTimeout(() => {
-        setVendors(mockVendors);
-        setIsLoading(false);
-      }, 1000);
+      console.log('Fetching verified vendors from database...');
+      
+      // Fetch only approved vendors from the database
+      const { data: vendorData, error } = await supabase
+        .from('vendors')
+        .select('*')
+        .eq('registration_status', 'approved');
+
+      if (error) {
+        console.error('Error fetching vendors:', error);
+        toast.error('Failed to load vendor directory');
+        setVendors([]);
+      } else {
+        console.log('Fetched vendors:', vendorData);
+        // Transform the data to match the expected format
+        const transformedVendors = vendorData?.map(vendor => ({
+          id: vendor.id,
+          vendor_id: vendor.vendor_id,
+          legal_entity_name: vendor.legal_entity_name,
+          trade_name: vendor.trade_name,
+          vendor_type: vendor.vendor_type,
+          year_established: vendor.year_established,
+          business_description: vendor.business_description,
+          products_services_description: vendor.products_services_description,
+          city: vendor.city,
+          state: vendor.state,
+          country: vendor.country,
+          website: vendor.website,
+          phone_number: vendor.phone_number,
+          registration_status: vendor.registration_status
+        })) || [];
+        
+        setVendors(transformedVendors);
+      }
+      setIsLoading(false);
     } catch (error) {
       console.error('Error fetching vendors:', error);
       toast.error('Failed to load vendor directory');
+      setVendors([]);
       setIsLoading(false);
     }
   };
@@ -249,7 +84,7 @@ const PublicVendorDirectory = () => {
     if (searchTerm.trim()) {
       const searchLower = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(vendor =>
-        vendor.legal_entity_name.toLowerCase().includes(searchLower) ||
+        vendor.legal_entity_name?.toLowerCase().includes(searchLower) ||
         vendor.trade_name?.toLowerCase().includes(searchLower) ||
         vendor.business_description?.toLowerCase().includes(searchLower) ||
         vendor.products_services_description?.toLowerCase().includes(searchLower) ||
@@ -325,8 +160,8 @@ const PublicVendorDirectory = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
@@ -342,7 +177,7 @@ const PublicVendorDirectory = () => {
                 <Users className="h-8 w-8 text-blue-600" />
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">Public Vendor Directory</h1>
-                  <p className="text-sm text-gray-600">Verified vendors in our network</p>
+                  <p className="text-sm text-gray-600">Verified registered vendors in our network</p>
                 </div>
               </div>
             </div>
@@ -443,15 +278,28 @@ const PublicVendorDirectory = () => {
           <Card>
             <CardContent className="text-center py-12">
               <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No vendors found</h3>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No registered vendors found</h3>
               <p className="text-gray-600 mb-4">
                 {searchTerm ? 
-                  `No vendors match your search for "${searchTerm}"` : 
-                  'No vendors match your filter criteria'
+                  `No registered vendors match your search for "${searchTerm}"` : 
+                  'No registered vendors match your filter criteria'
                 }
               </p>
               <Button onClick={resetFilters} variant="outline">
-                Clear filters and show all vendors
+                Clear filters and show all registered vendors
+              </Button>
+            </CardContent>
+          </Card>
+        ) : filteredVendors.length === 0 && vendors.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-12">
+              <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No registered vendors yet</h3>
+              <p className="text-gray-600 mb-4">
+                There are currently no approved vendors in the system.
+              </p>
+              <Button onClick={() => navigate('/vendor-registration')} variant="outline">
+                Register as a Vendor
               </Button>
             </CardContent>
           </Card>
@@ -480,7 +328,7 @@ const PublicVendorDirectory = () => {
                 <CardContent className="space-y-4">
                   <div>
                     <Badge variant="outline" className="mb-2">
-                      {vendor.vendor_type.charAt(0).toUpperCase() + vendor.vendor_type.slice(1)}
+                      {vendor.vendor_type?.charAt(0).toUpperCase() + vendor.vendor_type?.slice(1)}
                     </Badge>
                     {vendor.year_established && (
                       <Badge variant="outline" className="ml-2">
