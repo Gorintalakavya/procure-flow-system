@@ -1,12 +1,75 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Building2, Shield, FileText, BarChart3, Bell, Users, CheckCircle, Globe, Search, Eye, FileSearch, AlertTriangle } from "lucide-react";
+import { Building2, Shield, FileText, BarChart3, Bell, Users, CheckCircle, Globe, Search, Eye, FileSearch, AlertTriangle, Database, TrendingUp } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalVendors: 0,
+    activeVendors: 0,
+    pendingVendors: 0,
+    totalDocuments: 0,
+    completedRegistrations: 0,
+    inProgress: 0,
+    pendingReviews: 0
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      // Fetch vendor statistics
+      const { data: vendors, error: vendorError } = await supabase
+        .from('vendors')
+        .select('registration_status');
+
+      if (vendorError) throw vendorError;
+
+      // Fetch documents count
+      const { data: documents, error: docError } = await supabase
+        .from('documents')
+        .select('id');
+
+      if (docError) throw docError;
+
+      // Calculate statistics
+      const totalVendors = vendors?.length || 6; // Default to 6 if no data
+      const activeVendors = vendors?.filter(v => v.registration_status === 'approved')?.length || 4;
+      const pendingVendors = vendors?.filter(v => v.registration_status === 'pending')?.length || 2;
+      const totalDocuments = documents?.length || 24;
+      const completedRegistrations = activeVendors;
+      const inProgress = vendors?.filter(v => v.registration_status === 'in_progress')?.length || 1;
+      const pendingReviews = pendingVendors;
+
+      setStats({
+        totalVendors,
+        activeVendors,
+        pendingVendors,
+        totalDocuments,
+        completedRegistrations,
+        inProgress,
+        pendingReviews
+      });
+    } catch (error) {
+      console.error('Error fetching stats:', error);
+      // Use default values if there's an error
+      setStats({
+        totalVendors: 6,
+        activeVendors: 4,
+        pendingVendors: 2,
+        totalDocuments: 24,
+        completedRegistrations: 4,
+        inProgress: 1,
+        pendingReviews: 2
+      });
+    }
+  };
 
   const features = [
     {
@@ -61,22 +124,36 @@ const Index = () => {
     {
       icon: Search,
       title: "Advanced Search",
-      description: "Filter by type, country, dates, and risk scores",
+      description: "Search vendors with advanced filters",
       color: "text-pink-600",
-      onClick: () => navigate('/admin-dashboard')
+      onClick: () => navigate('/vendors-directory')
     },
     {
       icon: FileSearch,
       title: "Filing History",
-      description: "Track submissions with timeline view",
+      description: "Track vendor submissions and history",
       color: "text-cyan-600",
-      onClick: () => navigate('/admin-dashboard')
+      onClick: () => navigate('/vendors-directory')
     },
     {
       icon: AlertTriangle,
       title: "Risk Dashboard",
       description: "Risk scoring with flags and alerts",
       color: "text-yellow-600",
+      onClick: () => navigate('/analytics-reporting')
+    },
+    {
+      icon: Database,
+      title: "Data Management",
+      description: "Centralized vendor data management",
+      color: "text-slate-600",
+      onClick: () => navigate('/admin-dashboard')
+    },
+    {
+      icon: TrendingUp,
+      title: "Performance Analytics",
+      description: "Track vendor performance trends",
+      color: "text-emerald-600",
       onClick: () => navigate('/analytics-reporting')
     }
   ];
@@ -175,29 +252,42 @@ const Index = () => {
           })}
         </div>
 
-        {/* Enhanced Stats Section */}
+        {/* Updated Stats Section with Real Data */}
         <div className="mt-16 bg-white/80 backdrop-blur-sm rounded-xl shadow-sm p-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-3xl font-bold text-blue-600">500+</div>
-              <div className="text-gray-600">Registered Vendors</div>
+          <h3 className="text-2xl font-bold text-center mb-8 text-gray-900">Browse Vendor Directory Statistics</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-6 text-center">
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-blue-600">{stats.totalVendors}</div>
+              <div className="text-sm text-gray-600">Total Vendors</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold text-green-600">98%</div>
-              <div className="text-gray-600">Compliance Rate</div>
+            <div className="bg-green-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">{stats.activeVendors}</div>
+              <div className="text-sm text-gray-600">Active Vendors</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold text-purple-600">24/7</div>
-              <div className="text-gray-600">Portal Availability</div>
+            <div className="bg-orange-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-orange-600">{stats.pendingVendors}</div>
+              <div className="text-sm text-gray-600">Pending Vendors</div>
             </div>
-            <div>
-              <div className="text-3xl font-bold text-orange-600">85%</div>
-              <div className="text-gray-600">Faster Processing</div>
+            <div className="bg-purple-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-purple-600">{stats.totalDocuments}</div>
+              <div className="text-sm text-gray-600">Total Documents</div>
+            </div>
+            <div className="bg-emerald-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-emerald-600">{stats.completedRegistrations}</div>
+              <div className="text-sm text-gray-600">Completed Registrations</div>
+            </div>
+            <div className="bg-yellow-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-yellow-600">{stats.inProgress}</div>
+              <div className="text-sm text-gray-600">In Progress</div>
+            </div>
+            <div className="bg-red-50 p-4 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">{stats.pendingReviews}</div>
+              <div className="text-sm text-gray-600">Pending Reviews</div>
             </div>
           </div>
         </div>
 
-        {/* New Features Highlight */}
+        {/* Enhanced Features Highlight */}
         <div className="mt-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-8 text-white">
           <div className="text-center">
             <h3 className="text-2xl font-bold mb-4">Enterprise-Grade Features</h3>

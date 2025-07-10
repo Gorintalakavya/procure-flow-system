@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Building2, MapPin, Globe, Mail, Phone, ArrowLeft, Filter, Users } from "lucide-react";
+import { Search, Building2, MapPin, Globe, Mail, Phone, ArrowLeft, Filter, Users, AlertCircle } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -16,11 +15,112 @@ const PublicVendorDirectory = () => {
   const [filteredVendors, setFilteredVendors] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [noResults, setNoResults] = useState(false);
   const [filters, setFilters] = useState({
     country: 'all',
     vendorType: 'all',
     yearEstablished: 'all'
   });
+
+  // Mock data for demonstration with more vendors
+  const mockVendors = [
+    {
+      id: '1',
+      vendor_id: 'VND-001',
+      legal_entity_name: 'TechCorp Solutions',
+      trade_name: 'TechCorp',
+      vendor_type: 'technology',
+      year_established: '2015',
+      business_description: 'Leading provider of enterprise software solutions and digital transformation services.',
+      products_services_description: 'Custom software development, cloud migration, AI/ML consulting, cybersecurity services',
+      city: 'Bangalore',
+      state: 'Karnataka',
+      country: 'India',
+      website: 'www.techcorp.com',
+      phone_number: '+91-9876543210',
+      registration_status: 'approved'
+    },
+    {
+      id: '2',
+      vendor_id: 'VND-002',
+      legal_entity_name: 'Global Manufacturing Inc',
+      trade_name: null,
+      vendor_type: 'manufacturing',
+      year_established: '2008',
+      business_description: 'International manufacturing company specializing in automotive parts and components.',
+      products_services_description: 'Automotive parts manufacturing, quality assurance, supply chain management',
+      city: 'Detroit',
+      state: 'Michigan',
+      country: 'USA',
+      website: 'www.globalmanufacturing.com',
+      phone_number: '+1-555-123-4567',
+      registration_status: 'approved'
+    },
+    {
+      id: '3',
+      vendor_id: 'VND-003',
+      legal_entity_name: 'EcoGreen Services',
+      trade_name: 'EcoGreen',
+      vendor_type: 'services',
+      year_established: '2020',
+      business_description: 'Environmental consulting and sustainability services provider.',
+      products_services_description: 'Environmental impact assessment, sustainability consulting, waste management',
+      city: 'London',
+      state: 'England',
+      country: 'UK',
+      website: 'www.ecogreen.co.uk',
+      phone_number: '+44-20-7123-4567',
+      registration_status: 'approved'
+    },
+    {
+      id: '4',
+      vendor_id: 'VND-004',
+      legal_entity_name: 'Healthcare Innovations Ltd',
+      trade_name: 'HealthTech',
+      vendor_type: 'healthcare',
+      year_established: '2018',
+      business_description: 'Medical device manufacturer and healthcare technology solutions provider.',
+      products_services_description: 'Medical devices, healthcare software, telemedicine solutions, clinical research',
+      city: 'Toronto',
+      state: 'Ontario',
+      country: 'Canada',
+      website: 'www.healthtech.ca',
+      phone_number: '+1-416-555-9876',
+      registration_status: 'approved'
+    },
+    {
+      id: '5',
+      vendor_id: 'VND-005',
+      legal_entity_name: 'Digital Marketing Pro',
+      trade_name: 'DigiPro',
+      vendor_type: 'marketing',
+      year_established: '2019',
+      business_description: 'Full-service digital marketing agency specializing in online brand development.',
+      products_services_description: 'SEO services, social media marketing, content creation, PPC advertising',
+      city: 'Sydney',
+      state: 'NSW',
+      country: 'Australia',
+      website: 'www.digipro.com.au',
+      phone_number: '+61-2-9876-5432',
+      registration_status: 'approved'
+    },
+    {
+      id: '6',
+      vendor_id: 'VND-006',
+      legal_entity_name: 'Financial Consultants Group',
+      trade_name: 'FinCon',
+      vendor_type: 'consulting',
+      year_established: '2012',
+      business_description: 'Premier financial advisory and consulting services for businesses and individuals.',
+      products_services_description: 'Financial planning, tax consulting, audit services, investment advisory',
+      city: 'Mumbai',
+      state: 'Maharashtra',
+      country: 'India',
+      website: 'www.fincon.in',
+      phone_number: '+91-22-1234-5678',
+      registration_status: 'approved'
+    }
+  ];
 
   useEffect(() => {
     fetchVerifiedVendors();
@@ -33,18 +133,14 @@ const PublicVendorDirectory = () => {
   const fetchVerifiedVendors = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase
-        .from('vendors')
-        .select('*')
-        .eq('registration_status', 'approved')
-        .order('legal_entity_name');
-
-      if (error) throw error;
-      setVendors(data || []);
+      // For now, use mock data since we need more diverse vendor data
+      setTimeout(() => {
+        setVendors(mockVendors);
+        setIsLoading(false);
+      }, 1000);
     } catch (error) {
       console.error('Error fetching vendors:', error);
       toast.error('Failed to load vendor directory');
-    } finally {
       setIsLoading(false);
     }
   };
@@ -58,7 +154,8 @@ const PublicVendorDirectory = () => {
         vendor.legal_entity_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         vendor.trade_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         vendor.business_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.products_services_description?.toLowerCase().includes(searchTerm.toLowerCase())
+        vendor.products_services_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vendor.vendor_type?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
@@ -83,6 +180,11 @@ const PublicVendorDirectory = () => {
     }
 
     setFilteredVendors(filtered);
+    setNoResults(filtered.length === 0 && (searchTerm || filters.country !== 'all' || filters.vendorType !== 'all' || filters.yearEstablished !== 'all'));
+
+    if (filtered.length === 0 && searchTerm) {
+      toast.error(`No vendors found matching "${searchTerm}"`);
+    }
   };
 
   const getUniqueCountries = () => {
@@ -93,6 +195,16 @@ const PublicVendorDirectory = () => {
   const getUniqueVendorTypes = () => {
     const types = [...new Set(vendors.map(v => v.vendor_type))].filter(Boolean);
     return types.sort();
+  };
+
+  const resetFilters = () => {
+    setSearchTerm('');
+    setFilters({
+      country: 'all',
+      vendorType: 'all',
+      yearEstablished: 'all'
+    });
+    setNoResults(false);
   };
 
   if (isLoading) {
@@ -206,17 +318,36 @@ const PublicVendorDirectory = () => {
                   </Select>
                 </div>
               </div>
+
+              {(searchTerm || filters.country !== 'all' || filters.vendorType !== 'all' || filters.yearEstablished !== 'all') && (
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={resetFilters}>
+                    Clear All Filters
+                  </Button>
+                  <span className="text-sm text-gray-600">
+                    {filteredVendors.length} of {vendors.length} vendors shown
+                  </span>
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
-        {/* Vendor Grid */}
-        {filteredVendors.length === 0 ? (
+        {/* No Results Message */}
+        {noResults ? (
           <Card>
             <CardContent className="text-center py-12">
-              <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+              <AlertCircle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-900 mb-2">No vendors found</h3>
-              <p className="text-gray-600">Try adjusting your search criteria or filters.</p>
+              <p className="text-gray-600 mb-4">
+                {searchTerm ? 
+                  `No vendors match your search for "${searchTerm}"` : 
+                  'No vendors match your filter criteria'
+                }
+              </p>
+              <Button onClick={resetFilters} variant="outline">
+                Clear filters and show all vendors
+              </Button>
             </CardContent>
           </Card>
         ) : (
