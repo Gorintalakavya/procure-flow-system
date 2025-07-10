@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,7 @@ const PublicVendorDirectory = () => {
     yearEstablished: 'all'
   });
 
-  // Mock data for demonstration with more vendors
+  // Extended mock data with more diverse vendors
   const mockVendors = [
     {
       id: '1',
@@ -119,6 +120,102 @@ const PublicVendorDirectory = () => {
       website: 'www.fincon.in',
       phone_number: '+91-22-1234-5678',
       registration_status: 'approved'
+    },
+    {
+      id: '7',
+      vendor_id: 'VND-007',
+      legal_entity_name: 'Construction Masters Ltd',
+      trade_name: 'BuildPro',
+      vendor_type: 'construction',
+      year_established: '2010',
+      business_description: 'Large-scale construction and infrastructure development company.',
+      products_services_description: 'Commercial construction, residential projects, infrastructure development',
+      city: 'Dubai',
+      state: 'Dubai',
+      country: 'UAE',
+      website: 'www.buildpro.ae',
+      phone_number: '+971-4-123-4567',
+      registration_status: 'approved'
+    },
+    {
+      id: '8',
+      vendor_id: 'VND-008',
+      legal_entity_name: 'Food & Beverage Solutions',
+      trade_name: 'FoodTech',
+      vendor_type: 'food',
+      year_established: '2016',
+      business_description: 'Food processing and beverage manufacturing solutions provider.',
+      products_services_description: 'Food processing equipment, beverage systems, quality control solutions',
+      city: 'Singapore',
+      state: 'Singapore',
+      country: 'Singapore',
+      website: 'www.foodtech.sg',
+      phone_number: '+65-6123-4567',
+      registration_status: 'approved'
+    },
+    {
+      id: '9',
+      vendor_id: 'VND-009',
+      legal_entity_name: 'Logistics Excellence Corp',
+      trade_name: 'LogiEx',
+      vendor_type: 'logistics',
+      year_established: '2013',
+      business_description: 'Comprehensive logistics and supply chain management services.',
+      products_services_description: 'Freight forwarding, warehousing, distribution, supply chain optimization',
+      city: 'Rotterdam',
+      state: 'South Holland',
+      country: 'Netherlands',
+      website: 'www.logiex.nl',
+      phone_number: '+31-10-123-4567',
+      registration_status: 'approved'
+    },
+    {
+      id: '10',
+      vendor_id: 'VND-010',
+      legal_entity_name: 'Education Technology Hub',
+      trade_name: 'EduTech',
+      vendor_type: 'education',
+      year_established: '2021',
+      business_description: 'Educational technology solutions and e-learning platform provider.',
+      products_services_description: 'E-learning platforms, educational software, virtual classroom solutions',
+      city: 'Berlin',
+      state: 'Berlin',
+      country: 'Germany',
+      website: 'www.edutech.de',
+      phone_number: '+49-30-123-4567',
+      registration_status: 'approved'
+    },
+    {
+      id: '11',
+      vendor_id: 'VND-011',
+      legal_entity_name: 'Renewable Energy Systems',
+      trade_name: 'GreenPower',
+      vendor_type: 'energy',
+      year_established: '2017',
+      business_description: 'Solar and wind energy solutions for commercial and residential projects.',
+      products_services_description: 'Solar panel installation, wind turbines, energy storage systems',
+      city: 'San Francisco',
+      state: 'California',
+      country: 'USA',
+      website: 'www.greenpower.com',
+      phone_number: '+1-415-555-7890',
+      registration_status: 'approved'
+    },
+    {
+      id: '12',
+      vendor_id: 'VND-012',
+      legal_entity_name: 'Security Solutions International',
+      trade_name: 'SecureGuard',
+      vendor_type: 'security',
+      year_established: '2014',
+      business_description: 'Comprehensive security solutions for enterprises and government organizations.',
+      products_services_description: 'Security systems, surveillance equipment, access control, cybersecurity',
+      city: 'Tokyo',
+      state: 'Tokyo',
+      country: 'Japan',
+      website: 'www.secureguard.jp',
+      phone_number: '+81-3-1234-5678',
+      registration_status: 'approved'
     }
   ];
 
@@ -149,13 +246,16 @@ const PublicVendorDirectory = () => {
     let filtered = vendors;
 
     // Text search
-    if (searchTerm) {
+    if (searchTerm.trim()) {
+      const searchLower = searchTerm.toLowerCase().trim();
       filtered = filtered.filter(vendor =>
-        vendor.legal_entity_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.trade_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.business_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.products_services_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.vendor_type?.toLowerCase().includes(searchTerm.toLowerCase())
+        vendor.legal_entity_name.toLowerCase().includes(searchLower) ||
+        vendor.trade_name?.toLowerCase().includes(searchLower) ||
+        vendor.business_description?.toLowerCase().includes(searchLower) ||
+        vendor.products_services_description?.toLowerCase().includes(searchLower) ||
+        vendor.vendor_type?.toLowerCase().includes(searchLower) ||
+        vendor.city?.toLowerCase().includes(searchLower) ||
+        vendor.country?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -180,9 +280,13 @@ const PublicVendorDirectory = () => {
     }
 
     setFilteredVendors(filtered);
-    setNoResults(filtered.length === 0 && (searchTerm || filters.country !== 'all' || filters.vendorType !== 'all' || filters.yearEstablished !== 'all'));
+    
+    // Check if no results found with active filters or search
+    const hasActiveFilters = searchTerm.trim() || filters.country !== 'all' || filters.vendorType !== 'all' || filters.yearEstablished !== 'all';
+    setNoResults(filtered.length === 0 && hasActiveFilters);
 
-    if (filtered.length === 0 && searchTerm) {
+    // Show toast for search with no results
+    if (searchTerm.trim() && filtered.length === 0) {
       toast.error(`No vendors found matching "${searchTerm}"`);
     }
   };
