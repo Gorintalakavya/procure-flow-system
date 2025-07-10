@@ -283,7 +283,8 @@ const PublicVendorDirectory = () => {
     
     // Check if no results found with active filters or search
     const hasActiveFilters = searchTerm.trim() || filters.country !== 'all' || filters.vendorType !== 'all' || filters.yearEstablished !== 'all';
-    setNoResults(filtered.length === 0 && hasActiveFilters);
+    const shouldShowNoResults = filtered.length === 0 && hasActiveFilters;
+    setNoResults(shouldShowNoResults);
 
     // Show toast for search with no results
     if (searchTerm.trim() && filtered.length === 0) {
