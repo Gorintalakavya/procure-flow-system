@@ -79,6 +79,39 @@ export type Database = {
         }
         Relationships: []
       }
+      advanced_search_history: {
+        Row: {
+          created_at: string | null
+          executed_at: string
+          executed_by: string
+          filters_applied: Json | null
+          id: string
+          results_count: number | null
+          search_query: Json
+          search_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          executed_at?: string
+          executed_by: string
+          filters_applied?: Json | null
+          id?: string
+          results_count?: number | null
+          search_query: Json
+          search_type: string
+        }
+        Update: {
+          created_at?: string | null
+          executed_at?: string
+          executed_by?: string
+          filters_applied?: Json | null
+          id?: string
+          results_count?: number | null
+          search_query?: Json
+          search_type?: string
+        }
+        Relationships: []
+      }
       analytics_reports: {
         Row: {
           compliance_rate: number | null
@@ -125,6 +158,42 @@ export type Database = {
             referencedColumns: ["vendor_id"]
           },
         ]
+      }
+      archived_vendors: {
+        Row: {
+          archive_reason: string
+          archived_at: string
+          archived_by: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          original_vendor_id: string
+          status: string
+          vendor_data: Json
+        }
+        Insert: {
+          archive_reason: string
+          archived_at?: string
+          archived_by: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          original_vendor_id: string
+          status?: string
+          vendor_data: Json
+        }
+        Update: {
+          archive_reason?: string
+          archived_at?: string
+          archived_by?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          original_vendor_id?: string
+          status?: string
+          vendor_data?: Json
+        }
+        Relationships: []
       }
       audit_logs: {
         Row: {
@@ -183,6 +252,63 @@ export type Database = {
           },
         ]
       }
+      bulk_upload_logs: {
+        Row: {
+          created_at: string | null
+          error_log: Json | null
+          failed_records: number
+          file_name: string
+          file_size: number | null
+          id: string
+          processing_summary: Json | null
+          successful_records: number
+          total_records: number
+          updated_at: string | null
+          upload_batch_id: string
+          upload_completed_at: string | null
+          upload_started_at: string
+          upload_status: string
+          uploaded_by: string
+          validation_errors: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_log?: Json | null
+          failed_records?: number
+          file_name: string
+          file_size?: number | null
+          id?: string
+          processing_summary?: Json | null
+          successful_records?: number
+          total_records?: number
+          updated_at?: string | null
+          upload_batch_id: string
+          upload_completed_at?: string | null
+          upload_started_at?: string
+          upload_status: string
+          uploaded_by: string
+          validation_errors?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          error_log?: Json | null
+          failed_records?: number
+          file_name?: string
+          file_size?: number | null
+          id?: string
+          processing_summary?: Json | null
+          successful_records?: number
+          total_records?: number
+          updated_at?: string | null
+          upload_batch_id?: string
+          upload_completed_at?: string | null
+          upload_started_at?: string
+          upload_status?: string
+          uploaded_by?: string
+          validation_errors?: Json | null
+        }
+        Relationships: []
+      }
       compliance_tracking: {
         Row: {
           certification_name: string | null
@@ -239,6 +365,65 @@ export type Database = {
           },
         ]
       }
+      data_quality_flags: {
+        Row: {
+          created_at: string | null
+          field_name: string
+          flag_description: string
+          flag_type: string
+          flagged_at: string
+          flagged_by: string
+          id: string
+          notes: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          severity: string
+          status: string
+          updated_at: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          field_name: string
+          flag_description: string
+          flag_type: string
+          flagged_at?: string
+          flagged_by: string
+          id?: string
+          notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity: string
+          status?: string
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          field_name?: string
+          flag_description?: string
+          flag_type?: string
+          flagged_at?: string
+          flagged_by?: string
+          id?: string
+          notes?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          severity?: string
+          status?: string
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "data_quality_flags_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["vendor_id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           document_name: string
@@ -288,6 +473,66 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "documents_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["vendor_id"]
+          },
+        ]
+      }
+      filing_history: {
+        Row: {
+          created_at: string | null
+          document_id: string | null
+          document_type: string
+          filed_by: string
+          filed_on: string
+          filing_date: string
+          id: string
+          notes: string | null
+          reference_number: string | null
+          status: string
+          updated_at: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          document_id?: string | null
+          document_type: string
+          filed_by: string
+          filed_on?: string
+          filing_date?: string
+          id?: string
+          notes?: string | null
+          reference_number?: string | null
+          status: string
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          document_id?: string | null
+          document_type?: string
+          filed_by?: string
+          filed_on?: string
+          filing_date?: string
+          id?: string
+          notes?: string | null
+          reference_number?: string | null
+          status?: string
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "filing_history_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "filing_history_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
@@ -469,6 +714,80 @@ export type Database = {
           },
         ]
       }
+      vendor_documents: {
+        Row: {
+          access_level: string | null
+          created_at: string | null
+          document_category: string
+          document_name: string
+          document_type: string
+          expiry_date: string | null
+          file_path: string | null
+          file_size: number | null
+          id: string
+          is_current_version: boolean | null
+          metadata: Json | null
+          mime_type: string | null
+          status: string | null
+          tags: string[] | null
+          updated_at: string | null
+          upload_date: string | null
+          uploaded_by: string
+          vendor_id: string | null
+          version_number: number | null
+        }
+        Insert: {
+          access_level?: string | null
+          created_at?: string | null
+          document_category: string
+          document_name: string
+          document_type: string
+          expiry_date?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          is_current_version?: boolean | null
+          metadata?: Json | null
+          mime_type?: string | null
+          status?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+          upload_date?: string | null
+          uploaded_by: string
+          vendor_id?: string | null
+          version_number?: number | null
+        }
+        Update: {
+          access_level?: string | null
+          created_at?: string | null
+          document_category?: string
+          document_name?: string
+          document_type?: string
+          expiry_date?: string | null
+          file_path?: string | null
+          file_size?: number | null
+          id?: string
+          is_current_version?: boolean | null
+          metadata?: Json | null
+          mime_type?: string | null
+          status?: string | null
+          tags?: string[] | null
+          updated_at?: string | null
+          upload_date?: string | null
+          uploaded_by?: string
+          vendor_id?: string | null
+          version_number?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_documents_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["vendor_id"]
+          },
+        ]
+      }
       vendor_drafts: {
         Row: {
           annual_revenue: string | null
@@ -562,6 +881,68 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_performance_metrics: {
+        Row: {
+          benchmark_value: number | null
+          created_at: string | null
+          data_source: string | null
+          id: string
+          measured_at: string
+          measured_by: string
+          measurement_period_end: string
+          measurement_period_start: string
+          metric_type: string
+          metric_unit: string
+          metric_value: number
+          notes: string | null
+          performance_rating: string | null
+          updated_at: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          benchmark_value?: number | null
+          created_at?: string | null
+          data_source?: string | null
+          id?: string
+          measured_at?: string
+          measured_by: string
+          measurement_period_end: string
+          measurement_period_start: string
+          metric_type: string
+          metric_unit: string
+          metric_value: number
+          notes?: string | null
+          performance_rating?: string | null
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          benchmark_value?: number | null
+          created_at?: string | null
+          data_source?: string | null
+          id?: string
+          measured_at?: string
+          measured_by?: string
+          measurement_period_end?: string
+          measurement_period_start?: string
+          metric_type?: string
+          metric_unit?: string
+          metric_value?: number
+          notes?: string | null
+          performance_rating?: string | null
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_performance_metrics_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["vendor_id"]
+          },
+        ]
+      }
       vendor_profiles: {
         Row: {
           account_number: string | null
@@ -648,6 +1029,59 @@ export type Database = {
           },
           {
             foreignKeyName: "vendor_profiles_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["vendor_id"]
+          },
+        ]
+      }
+      vendor_risk_scores: {
+        Row: {
+          assessed_by: string
+          assessment_criteria: Json | null
+          created_at: string | null
+          id: string
+          last_assessed: string
+          next_assessment_due: string | null
+          notes: string | null
+          risk_level: string
+          risk_score: number
+          status: string
+          updated_at: string | null
+          vendor_id: string | null
+        }
+        Insert: {
+          assessed_by: string
+          assessment_criteria?: Json | null
+          created_at?: string | null
+          id?: string
+          last_assessed?: string
+          next_assessment_due?: string | null
+          notes?: string | null
+          risk_level: string
+          risk_score: number
+          status: string
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Update: {
+          assessed_by?: string
+          assessment_criteria?: Json | null
+          created_at?: string | null
+          id?: string
+          last_assessed?: string
+          next_assessment_due?: string | null
+          notes?: string | null
+          risk_level?: string
+          risk_score?: number
+          status?: string
+          updated_at?: string | null
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vendor_risk_scores_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
