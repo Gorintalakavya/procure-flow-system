@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -203,7 +202,7 @@ const VendorProfile = () => {
       const { data: profile } = await supabase
         .from('vendor_profiles')
         .select('*')
-        .eq('vendor_id', vendorUser.vendorId)
+        .eq('user_id', vendor.id)
         .single();
 
       if (profile) {
@@ -302,7 +301,6 @@ const VendorProfile = () => {
       const { error: profileError } = await supabase
         .from('vendor_profiles')
         .upsert({
-          vendor_id: vendorData.vendor_id,
           user_id: vendorData.id, // Use the vendor's UUID as user_id
           bank_name: financialInfo.bank_name,
           account_number: financialInfo.account_number,
@@ -352,7 +350,6 @@ const VendorProfile = () => {
       const { error: profileError } = await supabase
         .from('vendor_profiles')
         .upsert({
-          vendor_id: vendorData.vendor_id,
           user_id: vendorData.id,
           primary_contact: procurementInfo.primary_contact,
           secondary_contact: procurementInfo.secondary_contact,
@@ -400,7 +397,6 @@ const VendorProfile = () => {
       const { error: profileError } = await supabase
         .from('vendor_profiles')
         .upsert({
-          vendor_id: vendorData.vendor_id,
           user_id: vendorData.id,
           certifications: complianceInfo.certifications,
           compliance_forms: complianceInfo.compliance_forms,
@@ -435,7 +431,6 @@ const VendorProfile = () => {
       const { error } = await supabase
         .from('vendor_profiles')
         .upsert({
-          vendor_id: vendorData.vendor_id,
           user_id: vendorData.id,
           current_directors: directorsInfo.current_directors,
           past_directors: directorsInfo.past_directors
