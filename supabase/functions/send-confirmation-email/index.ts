@@ -1,332 +1,121 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { Resend } from "npm:resend@2.0.0";
+
+const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 interface EmailRequest {
   email: string;
-  vendorId: string;
-  section: string;
-  action: string;
+  vendorId?: string;
+  adminId?: string;
+  section?: string;
+  action?: string;
+  password?: string;
+  isNewAccount?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  console.log('📧 Email function called with method:', req.method);
-  
-  if (req.method === 'OPTIONS') {
+  // Handle CORS preflight requests
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const requestBody = await req.json();
-    console.log('📧 Request body received:', requestBody);
-    
-    const { email, vendorId, section, action }: EmailRequest = requestBody;
+    const { email, vendorId, adminId, section, action, password, isNewAccount }: EmailRequest = await req.json();
 
-    console.log('📧 Processing email request:');
-    console.log('- Email:', email);
-    console.log('- ID (Vendor/Admin):', vendorId);
-    console.log('- Section:', section);
-    console.log('- Action:', action);
+    let emailSubject = "";
+    let emailContent = "";
 
-    let subject = '';
-    let htmlContent = '';
-    let textContent = '';
-
-    if (section === 'admin') {
-      if (action === 'signup') {
-        subject = `🎉 Welcome to Admin Portal - Account Created Successfully`;
-        htmlContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Admin Account Created</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Welcome to Admin Portal!</h1>
-            </div>
-            
-            <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <h2 style="color: #333; margin-bottom: 20px;">Admin Account Created Successfully</h2>
-              <p>Dear Administrator,</p>
-              <p>Congratulations! Your admin account has been successfully created in our procurement portal system.</p>
-              
-              <div style="background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #667eea;">
-                <h3 style="margin-top: 0; color: #667eea;">Account Details:</h3>
-                <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${email}</p>
-                <p style="margin: 5px 0;"><strong>🆔 Admin ID:</strong> ${vendorId}</p>
-                <p style="margin: 5px 0;"><strong>✅ Account Status:</strong> Active</p>
-                <p style="margin: 5px 0;"><strong>👤 Role:</strong> Administrator</p>
-                <p style="margin: 5px 0;"><strong>🕐 Created:</strong> ${new Date().toLocaleString()}</p>
-              </div>
-              
-              <p>You now have full administrative access to manage vendor registrations, compliance tracking, and system oversight.</p>
-              
-              <div style="text-align: center; margin: 30px 0;">
-                <p style="background-color: #667eea; color: white; padding: 12px 30px; border-radius: 5px; font-weight: bold; display: inline-block; margin: 0;">
-                  🔗 Access Your Admin Dashboard
-                </p>
-              </div>
-              
-              <p>If you have any questions or need assistance, please contact our support team.</p>
-              <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
-            </div>
-            
-            <div style="text-align: center; padding: 20px; color: #666; font-size: 12px;">
-              <p>This is an automated message. Please do not reply to this email.</p>
-            </div>
-          </body>
-          </html>
+    if (isNewAccount && password) {
+      // Send credentials for new account
+      if (vendorId) {
+        emailSubject = "Welcome to Vendor Portal - Your Login Credentials";
+        emailContent = `
+          <h1>Welcome to the Vendor Portal!</h1>
+          <p>Your vendor account has been created successfully.</p>
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>Your Login Credentials:</h2>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Password:</strong> ${password}</p>
+            <p><strong>Vendor ID:</strong> ${vendorId}</p>
+          </div>
+          <p><strong>Important:</strong> Please save these credentials securely. You will need them to access your vendor portal.</p>
+          <p>Please visit the vendor portal to complete your profile and upload required documents.</p>
+          <p>If you have any questions, please contact our support team.</p>
+          <p>Best regards,<br>The Vendor Management Team</p>
         `;
-        textContent = `Welcome to Admin Portal! Your admin account (${email}) has been created successfully. Admin ID: ${vendorId}`;
-      } else if (action === 'signin') {
-        subject = `🔐 Admin Portal - Successful Login Notification`;
-        htmlContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Admin Login Notification</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 25px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 24px;">🔐 Admin Login Notification</h1>
-            </div>
-            
-            <div style="background: white; padding: 25px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <p>Dear Administrator,</p>
-              <p>You have successfully logged into your admin portal account.</p>
-              
-              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <p style="margin: 5px 0;"><strong>🕐 Login Time:</strong> ${new Date().toLocaleString()}</p>
-                <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${email}</p>
-                <p style="margin: 5px 0;"><strong>🆔 Admin ID:</strong> ${vendorId}</p>
-              </div>
-              
-              <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
-            </div>
-          </body>
-          </html>
+      } else if (adminId) {
+        emailSubject = "Welcome to Admin Portal - Your Login Credentials";
+        emailContent = `
+          <h1>Welcome to the Admin Portal!</h1>
+          <p>Your admin account has been created successfully.</p>
+          <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h2>Your Login Credentials:</h2>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Password:</strong> ${password}</p>
+            <p><strong>Admin ID:</strong> ${adminId}</p>
+          </div>
+          <p><strong>Important:</strong> Please save these credentials securely. You will need them to access the admin portal.</p>
+          <p>Please visit the admin portal to manage vendors and system settings.</p>
+          <p>If you have any questions, please contact the system administrator.</p>
+          <p>Best regards,<br>The Admin Team</p>
         `;
-        textContent = `Admin login successful for ${email} at ${new Date().toLocaleString()}`;
       }
-    } else if (section === 'vendor') {
-      if (action === 'registration') {
-        subject = `🎉 Vendor Registration Successful - Welcome to Our Network!`;
-        htmlContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Vendor Registration Successful</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: #333; margin: 0; font-size: 28px;">🎉 Registration Successful!</h1>
-            </div>
-            
-            <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <h2 style="color: #333; margin-bottom: 20px;">Welcome to Our Vendor Network</h2>
-              <p>Dear Vendor Partner,</p>
-              <p>Thank you for registering with our procurement portal system! We're excited to have you join our vendor network.</p>
-              
-              <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
-                <h3 style="margin-top: 0; color: #28a745;">Registration Details:</h3>
-                <p style="margin: 5px 0;"><strong>🆔 Vendor ID:</strong> ${vendorId}</p>
-                <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${email}</p>
-                <p style="margin: 5px 0;"><strong>📋 Registration Status:</strong> Incomplete</p>
-                <p style="margin: 5px 0;"><strong>🕐 Submitted:</strong> ${new Date().toLocaleString()}</p>
-              </div>
-              
-              <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeaa7; margin: 20px 0;">
-                <h3 style="margin-top: 0; color: #856404;">Important: Next Steps Required</h3>
-                <p style="margin: 0;">Your registration has been submitted. Please create your login credentials to access your vendor profile and complete your registration.</p>
-              </div>
-              
-              <p><strong>Next steps:</strong></p>
-              <ol style="background-color: #f0f7ff; padding: 15px 15px 15px 35px; border-radius: 5px; margin: 15px 0;">
-                <li>✅ Create your login credentials using your Vendor ID</li>
-                <li>📝 Complete your vendor profile with additional information</li>
-                <li>📄 Upload required compliance documents</li>
-                <li>⏳ Wait for admin approval</li>
-              </ol>
-              
-              <p>If you have any questions, please contact our support team with your Vendor ID: <strong>${vendorId}</strong></p>
-              <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
-            </div>
-          </body>
-          </html>
+    } else {
+      // Send confirmation for profile updates
+      if (vendorId) {
+        emailSubject = `Vendor Profile ${action === 'update' ? 'Updated' : 'Confirmation'}`;
+        emailContent = `
+          <h1>Profile Update Confirmation</h1>
+          <p>Your vendor profile has been successfully updated.</p>
+          <p><strong>Vendor ID:</strong> ${vendorId}</p>
+          <p><strong>Section Updated:</strong> ${section}</p>
+          <p><strong>Updated At:</strong> ${new Date().toLocaleString()}</p>
+          <p>Thank you for keeping your information up to date.</p>
+          <p>Best regards,<br>The Vendor Management Team</p>
         `;
-        textContent = `Vendor registration successful! Vendor ID: ${vendorId}. Please create your login credentials to continue.`;
-      } else if (action === 'signup') {
-        subject = `🎉 Welcome to Vendor Portal - Account Created Successfully`;
-        htmlContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Vendor Account Created</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 28px;">🎉 Welcome to Vendor Portal!</h1>
-            </div>
-            
-            <div style="background: white; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <h2 style="color: #333; margin-bottom: 20px;">Account Created Successfully</h2>
-              <p>Dear Vendor Partner,</p>
-              <p>Your vendor account has been successfully created in our procurement portal system.</p>
-              
-              <div style="background-color: #e8f5e8; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745;">
-                <h3 style="margin-top: 0; color: #28a745;">Account Details:</h3>
-                <p style="margin: 5px 0;"><strong>🆔 Vendor ID:</strong> ${vendorId}</p>
-                <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${email}</p>
-                <p style="margin: 5px 0;"><strong>✅ Account Status:</strong> Active</p>
-                <p style="margin: 5px 0;"><strong>🕐 Created:</strong> ${new Date().toLocaleString()}</p>
-              </div>
-              
-              <p>You can now access your vendor profile and manage your information through our portal.</p>
-              
-              <p><strong>Please complete all sections of your vendor profile including:</strong></p>
-              <ul style="background-color: #f0f7ff; padding: 15px 15px 15px 35px; border-radius: 5px; margin: 15px 0;">
-                <li>ℹ️ General Information</li>
-                <li>💰 Financial Information</li>
-                <li>📋 Procurement Information</li>
-                <li>🛡️ Compliance Information</li>
-                <li>📄 Document Uploads</li>
-              </ul>
-              
-              <p>If you have any questions, please contact our support team.</p>
-              <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
-            </div>
-          </body>
-          </html>
+      } else if (adminId) {
+        emailSubject = `Admin Login Confirmation`;
+        emailContent = `
+          <h1>Admin Login Confirmation</h1>
+          <p>You have successfully logged into the admin portal.</p>
+          <p><strong>Admin ID:</strong> ${adminId}</p>
+          <p><strong>Login Time:</strong> ${new Date().toLocaleString()}</p>
+          <p>If this was not you, please contact support immediately.</p>
+          <p>Best regards,<br>The Admin Team</p>
         `;
-        textContent = `Welcome to Vendor Portal! Your account (${email}) has been created. Vendor ID: ${vendorId}`;
-      } else if (action === 'signin') {
-        subject = `🔐 Vendor Portal - Successful Login Notification`;
-        htmlContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Vendor Login Notification</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 25px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 24px;">🔐 Successful Login</h1>
-            </div>
-            
-            <div style="background: white; padding: 25px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <p>Dear Vendor,</p>
-              <p>You have successfully logged into your vendor portal account.</p>
-              
-              <div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
-                <p style="margin: 5px 0;"><strong>🆔 Vendor ID:</strong> ${vendorId}</p>
-                <p style="margin: 5px 0;"><strong>🕐 Login Time:</strong> ${new Date().toLocaleString()}</p>
-                <p style="margin: 5px 0;"><strong>📧 Email:</strong> ${email}</p>
-              </div>
-              
-              <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
-            </div>
-          </body>
-          </html>
-        `;
-        textContent = `Vendor login successful for ${email} at ${new Date().toLocaleString()}`;
-      } else if (action === 'forgot-password') {
-        subject = `🔒 Password Reset Instructions - Procurement Portal`;
-        htmlContent = `
-          <!DOCTYPE html>
-          <html>
-          <head>
-            <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Password Reset</title>
-          </head>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%); padding: 25px; text-align: center; border-radius: 10px 10px 0 0;">
-              <h1 style="color: white; margin: 0; font-size: 24px;">🔒 Password Reset Request</h1>
-            </div>
-            
-            <div style="background: white; padding: 25px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 10px 10px;">
-              <p>Dear User,</p>
-              <p>We received a request to reset your password for your account: <strong>${email}</strong></p>
-              
-              <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; border: 1px solid #ffeaa7; margin: 20px 0;">
-                <p style="margin: 0; color: #856404;"><strong>Note:</strong> If you didn't request this password reset, please ignore this email. Your account remains secure.</p>
-              </div>
-              
-              <p>To reset your password, please contact our support team with your account details.</p>
-              <p>Best regards,<br><strong>Procurement Portal Team</strong></p>
-            </div>
-          </body>
-          </html>
-        `;
-        textContent = `Password reset requested for ${email}. Please contact support for assistance.`;
       }
     }
 
-    // Log the email details for debugging
-    const emailData = {
-      to: email,
-      subject: subject,
-      html: htmlContent,
-      text: textContent,
-      timestamp: new Date().toISOString(),
-      section: section,
-      action: action,
-      id: vendorId
-    };
+    const emailResponse = await resend.emails.send({
+      from: "Vendor Portal <onboarding@resend.dev>",
+      to: [email],
+      subject: emailSubject,
+      html: emailContent,
+    });
 
-    console.log('📧 Email would be sent with the following details:');
-    console.log('To:', email);
-    console.log('Subject:', subject);
-    console.log('✅ Enhanced email content prepared successfully');
+    console.log("Email sent successfully:", emailResponse);
 
-    // In a production environment, you would integrate with a real email service
-    // For now, we're simulating the email sending process
-    
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: 'Enhanced confirmation email processed successfully',
-      emailData: {
-        to: email,
-        subject: subject,
-        timestamp: emailData.timestamp,
-        section: section,
-        action: action,
-        enhanced: true
-      },
-      timestamp: new Date().toISOString()
-    }), {
+    return new Response(JSON.stringify(emailResponse), {
       status: 200,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...corsHeaders,
       },
     });
-
-  } catch (error) {
-    console.error('❌ Error in send-confirmation-email function:', error);
+  } catch (error: any) {
+    console.error("Error in send-confirmation-email function:", error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        timestamp: new Date().toISOString(),
-        success: false
-      }),
+      JSON.stringify({ error: error.message }),
       {
         status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        headers: { "Content-Type": "application/json", ...corsHeaders },
       }
     );
   }

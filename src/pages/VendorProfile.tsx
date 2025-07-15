@@ -13,6 +13,21 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import DocumentUploadSection from "@/components/DocumentUploadSection";
 
+interface Director {
+  din: string;
+  name: string;
+  designation: string;
+  appointment_date: string;
+}
+
+interface PastDirector {
+  din: string;
+  name: string;
+  designation: string;
+  appointment_date: string;
+  cessation_date: string;
+}
+
 const VendorProfile = () => {
   const navigate = useNavigate();
   const [vendorData, setVendorData] = useState<any>(null);
@@ -37,7 +52,6 @@ const VendorProfile = () => {
     annual_revenue: '',
     business_description: '',
     products_services_description: '',
-    // New fields
     cin_number: '',
     roc_name: '',
     registration_number: '',
@@ -61,7 +75,6 @@ const VendorProfile = () => {
     account_type: '',
     swift_code: '',
     bank_address: '',
-    // New fields
     authorised_capital: '',
     paid_up_capital: ''
   });
@@ -84,14 +97,15 @@ const VendorProfile = () => {
     regulatory_notes: '',
     last_audit_date: '',
     next_audit_date: '',
-    // New fields
     company_status: '',
     date_of_balance_sheet: '',
     date_of_last_agm: ''
   });
 
-  // New state for directors
-  const [directorsInfo, setDirectorsInfo] = useState({
+  const [directorsInfo, setDirectorsInfo] = useState<{
+    current_directors: Director[];
+    past_directors: PastDirector[];
+  }>({
     current_directors: [
       { din: '', name: '', designation: '', appointment_date: '' }
     ],
@@ -219,16 +233,16 @@ const VendorProfile = () => {
         }));
 
         // Fetch directors info if stored in profile
-        if (profile.current_directors) {
+        if (profile.current_directors && Array.isArray(profile.current_directors)) {
           setDirectorsInfo(prev => ({
             ...prev,
-            current_directors: profile.current_directors
+            current_directors: profile.current_directors as Director[]
           }));
         }
-        if (profile.past_directors) {
+        if (profile.past_directors && Array.isArray(profile.past_directors)) {
           setDirectorsInfo(prev => ({
             ...prev,
-            past_directors: profile.past_directors
+            past_directors: profile.past_directors as PastDirector[]
           }));
         }
       }
@@ -270,7 +284,6 @@ const VendorProfile = () => {
   const saveFinancialInfo = async () => {
     setIsLoading(true);
     try {
-      // Update vendors table
       const { error: vendorError } = await supabase
         .from('vendors')
         .update({
@@ -285,7 +298,6 @@ const VendorProfile = () => {
 
       if (vendorError) throw vendorError;
 
-      // Update or insert vendor profile
       const { error: profileError } = await supabase
         .from('vendor_profiles')
         .upsert({
@@ -323,7 +335,6 @@ const VendorProfile = () => {
   const saveProcurementInfo = async () => {
     setIsLoading(true);
     try {
-      // Update vendors table
       const { error: vendorError } = await supabase
         .from('vendors')
         .update({
@@ -336,7 +347,6 @@ const VendorProfile = () => {
 
       if (vendorError) throw vendorError;
 
-      // Update vendor profile
       const { error: profileError } = await supabase
         .from('vendor_profiles')
         .upsert({
@@ -370,7 +380,6 @@ const VendorProfile = () => {
   const saveComplianceInfo = async () => {
     setIsLoading(true);
     try {
-      // Update vendors table
       const { error: vendorError } = await supabase
         .from('vendors')
         .update({
@@ -385,7 +394,6 @@ const VendorProfile = () => {
 
       if (vendorError) throw vendorError;
 
-      // Update vendor profile
       const { error: profileError } = await supabase
         .from('vendor_profiles')
         .upsert({
@@ -420,7 +428,6 @@ const VendorProfile = () => {
   const saveDirectorsInfo = async () => {
     setIsLoading(true);
     try {
-      // Save directors info in vendor_profiles or a dedicated table
       const { error } = await supabase
         .from('vendor_profiles')
         .upsert({
@@ -727,7 +734,6 @@ const VendorProfile = () => {
                   </div>
                 </div>
 
-                {/* Address Information */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Address Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -793,7 +799,6 @@ const VendorProfile = () => {
                   </div>
                 </div>
 
-                {/* Business Information */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Business Information</h3>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1234,7 +1239,6 @@ const VendorProfile = () => {
               </CardContent>
             </Card>
 
-            {/* Document Upload Section */}
             <DocumentUploadSection vendorId={vendorData.vendor_id} />
           </TabsContent>
 

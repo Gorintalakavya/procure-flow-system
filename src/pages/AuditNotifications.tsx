@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Activity, Bell, AlertTriangle, CheckCircle, Clock, User, FileText } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import VendorNotifications from "@/components/VendorNotifications";
 
 interface AuditLog {
   id: string;
@@ -118,37 +119,6 @@ const AuditNotifications = () => {
         }
       ];
 
-      // Generate sample notifications
-      const sampleNotifications = [
-        {
-          title: 'Vendor Status Updated',
-          message: 'Vendor VEN001 status has been changed to approved',
-          notification_type: 'status_update',
-          priority: 'medium',
-          is_read: false,
-          vendor_id: 'VEN001',
-          user_id: null
-        },
-        {
-          title: 'Document Expiring Soon',
-          message: 'ISO certificate for vendor VEN002 expires in 30 days',
-          notification_type: 'compliance_alert',
-          priority: 'high',
-          is_read: false,
-          vendor_id: 'VEN002',
-          user_id: null
-        },
-        {
-          title: 'New Vendor Registration',
-          message: 'A new vendor has registered and requires review',
-          notification_type: 'vendor_registration',
-          priority: 'medium',
-          is_read: true,
-          vendor_id: 'VEN003',
-          user_id: null
-        }
-      ];
-
       // Insert sample data if tables are empty
       const { data: existingLogs } = await supabase
         .from('audit_logs')
@@ -157,15 +127,6 @@ const AuditNotifications = () => {
 
       if (!existingLogs || existingLogs.length === 0) {
         await supabase.from('audit_logs').insert(sampleAuditLogs);
-      }
-
-      const { data: existingNotifications } = await supabase
-        .from('notifications')
-        .select('id')
-        .limit(1);
-
-      if (!existingNotifications || existingNotifications.length === 0) {
-        await supabase.from('notifications').insert(sampleNotifications);
       }
 
       // Update stats
@@ -283,17 +244,26 @@ const AuditNotifications = () => {
         </div>
 
         {/* Tabs for Audit Logs and Notifications */}
-        <Tabs defaultValue="audit-logs" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+        <Tabs defaultValue="vendor-notifications" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="vendor-notifications" className="flex items-center gap-2">
+              <Bell className="h-4 w-4" />
+              Vendor Notifications
+            </TabsTrigger>
             <TabsTrigger value="audit-logs" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Audit Logs
             </TabsTrigger>
-            <TabsTrigger value="notifications" className="flex items-center gap-2">
+            <TabsTrigger value="system-notifications" className="flex items-center gap-2">
               <Bell className="h-4 w-4" />
-              Notifications
+              System Notifications
             </TabsTrigger>
           </TabsList>
+
+          {/* Vendor Notifications Tab */}
+          <TabsContent value="vendor-notifications">
+            <VendorNotifications />
+          </TabsContent>
 
           {/* Audit Logs Tab */}
           <TabsContent value="audit-logs">
@@ -337,8 +307,8 @@ const AuditNotifications = () => {
             </Card>
           </TabsContent>
 
-          {/* Notifications Tab */}
-          <TabsContent value="notifications">
+          {/* System Notifications Tab */}
+          <TabsContent value="system-notifications">
             <Card>
               <CardHeader>
                 <CardTitle>System Notifications</CardTitle>
