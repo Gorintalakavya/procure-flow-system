@@ -232,17 +232,17 @@ const VendorProfile = () => {
           next_audit_date: profile.next_audit_date || ''
         }));
 
-        // Fetch directors info if stored in profile
+        // Fetch directors info if stored in profile - fixed type conversion
         if (profile.current_directors && Array.isArray(profile.current_directors)) {
           setDirectorsInfo(prev => ({
             ...prev,
-            current_directors: profile.current_directors as Director[]
+            current_directors: profile.current_directors as unknown as Director[]
           }));
         }
         if (profile.past_directors && Array.isArray(profile.past_directors)) {
           setDirectorsInfo(prev => ({
             ...prev,
-            past_directors: profile.past_directors as PastDirector[]
+            past_directors: profile.past_directors as unknown as PastDirector[]
           }));
         }
       }
@@ -298,6 +298,7 @@ const VendorProfile = () => {
 
       if (vendorError) throw vendorError;
 
+      // Fixed: removed vendor_id from vendor_profiles upsert
       const { error: profileError } = await supabase
         .from('vendor_profiles')
         .upsert({
@@ -804,7 +805,7 @@ const VendorProfile = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <Label htmlFor="vendor_type">Vendor Type *</Label>
-                      <Select value={generalInfo.vendor_type} onValueChange={(value) => setGeneralInfo({...generalInfo, vendor_type: value})}>
+                      <Select value={generalInfo.vendor_type || ''} onValueChange={(value) => setGeneralInfo({...generalInfo, vendor_type: value})}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select vendor type" />
                         </SelectTrigger>
@@ -827,7 +828,7 @@ const VendorProfile = () => {
                     </div>
                     <div>
                       <Label htmlFor="employee_count">Employee Count</Label>
-                      <Select value={generalInfo.employee_count} onValueChange={(value) => setGeneralInfo({...generalInfo, employee_count: value})}>
+                      <Select value={generalInfo.employee_count || ''} onValueChange={(value) => setGeneralInfo({...generalInfo, employee_count: value})}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select employee count" />
                         </SelectTrigger>
@@ -842,7 +843,7 @@ const VendorProfile = () => {
                     </div>
                     <div>
                       <Label htmlFor="annual_revenue">Annual Revenue</Label>
-                      <Select value={generalInfo.annual_revenue} onValueChange={(value) => setGeneralInfo({...generalInfo, annual_revenue: value})}>
+                      <Select value={generalInfo.annual_revenue || ''} onValueChange={(value) => setGeneralInfo({...generalInfo, annual_revenue: value})}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select annual revenue" />
                         </SelectTrigger>
@@ -922,7 +923,7 @@ const VendorProfile = () => {
                   </div>
                   <div>
                     <Label htmlFor="payment_terms">Payment Terms</Label>
-                    <Select value={financialInfo.payment_terms} onValueChange={(value) => setFinancialInfo({...financialInfo, payment_terms: value})}>
+                    <Select value={financialInfo.payment_terms || ''} onValueChange={(value) => setFinancialInfo({...financialInfo, payment_terms: value})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select payment terms" />
                       </SelectTrigger>
@@ -937,7 +938,7 @@ const VendorProfile = () => {
                   </div>
                   <div>
                     <Label htmlFor="currency">Currency</Label>
-                    <Select value={financialInfo.currency} onValueChange={(value) => setFinancialInfo({...financialInfo, currency: value})}>
+                    <Select value={financialInfo.currency || 'USD'} onValueChange={(value) => setFinancialInfo({...financialInfo, currency: value})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select currency" />
                       </SelectTrigger>
@@ -985,7 +986,7 @@ const VendorProfile = () => {
                     </div>
                     <div>
                       <Label htmlFor="account_type">Account Type</Label>
-                      <Select value={financialInfo.account_type} onValueChange={(value) => setFinancialInfo({...financialInfo, account_type: value})}>
+                      <Select value={financialInfo.account_type || ''} onValueChange={(value) => setFinancialInfo({...financialInfo, account_type: value})}>
                         <SelectTrigger>
                           <SelectValue placeholder="Select account type" />
                         </SelectTrigger>
@@ -1107,7 +1108,7 @@ const VendorProfile = () => {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
                     <Label htmlFor="w9_status">W-9 Status</Label>
-                    <Select value={complianceInfo.w9_status} onValueChange={(value) => setComplianceInfo({...complianceInfo, w9_status: value})}>
+                    <Select value={complianceInfo.w9_status || ''} onValueChange={(value) => setComplianceInfo({...complianceInfo, w9_status: value})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select W-9 status" />
                       </SelectTrigger>
@@ -1121,7 +1122,7 @@ const VendorProfile = () => {
                   </div>
                   <div>
                     <Label htmlFor="w8_ben_status">W8-BEN Status</Label>
-                    <Select value={complianceInfo.w8_ben_status} onValueChange={(value) => setComplianceInfo({...complianceInfo, w8_ben_status: value})}>
+                    <Select value={complianceInfo.w8_ben_status || ''} onValueChange={(value) => setComplianceInfo({...complianceInfo, w8_ben_status: value})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select W8-BEN status" />
                       </SelectTrigger>
@@ -1135,7 +1136,7 @@ const VendorProfile = () => {
                   </div>
                   <div>
                     <Label htmlFor="w8_ben_e_status">W8-BEN-E Status</Label>
-                    <Select value={complianceInfo.w8_ben_e_status} onValueChange={(value) => setComplianceInfo({...complianceInfo, w8_ben_e_status: value})}>
+                    <Select value={complianceInfo.w8_ben_e_status || ''} onValueChange={(value) => setComplianceInfo({...complianceInfo, w8_ben_e_status: value})}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select W8-BEN-E status" />
                       </SelectTrigger>
