@@ -298,7 +298,7 @@ const VendorProfile = () => {
 
       if (vendorError) throw vendorError;
 
-      // Fixed: removed vendor_id from vendor_profiles upsert
+      // Fixed: removed vendor_id from vendor_profiles upsert since it's not a valid column
       const { error: profileError } = await supabase
         .from('vendor_profiles')
         .upsert({
@@ -848,11 +848,11 @@ const VendorProfile = () => {
                           <SelectValue placeholder="Select annual revenue" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="<$1M">&lt;$1M</SelectItem>
-                          <SelectItem value="$1M-$10M">$1M-$10M</SelectItem>
-                          <SelectItem value="$10M-$50M">$10M-$50M</SelectItem>
-                          <SelectItem value="$50M-$100M">$50M-$100M</SelectItem>
-                          <SelectItem value=">$100M">&gt;$100M</SelectItem>
+                          <SelectItem value="less_than_1m">&lt;$1M</SelectItem>
+                          <SelectItem value="1m_to_10m">$1M-$10M</SelectItem>
+                          <SelectItem value="10m_to_50m">$10M-$50M</SelectItem>
+                          <SelectItem value="50m_to_100m">$50M-$100M</SelectItem>
+                          <SelectItem value="more_than_100m">&gt;$100M</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
