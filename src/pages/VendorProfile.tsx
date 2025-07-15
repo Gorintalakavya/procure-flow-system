@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { User, DollarSign, FileText, Shield, ArrowLeft } from "lucide-react";
+import { User, DollarSign, FileText, Shield, ArrowLeft, Users } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,7 +35,18 @@ const VendorProfile = () => {
     employee_count: '',
     annual_revenue: '',
     business_description: '',
-    products_services_description: ''
+    products_services_description: '',
+    // New fields
+    cin_number: '',
+    roc_name: '',
+    registration_number: '',
+    date_of_incorporation: '',
+    listed_in_stock_exchange: '',
+    category_of_company: '',
+    subcategory_of_company: '',
+    class_of_company: '',
+    roc_office: '',
+    rd_name_region: ''
   });
   
   const [financialInfo, setFinancialInfo] = useState({
@@ -48,7 +59,10 @@ const VendorProfile = () => {
     routing_number: '',
     account_type: '',
     swift_code: '',
-    bank_address: ''
+    bank_address: '',
+    // New fields
+    authorised_capital: '',
+    paid_up_capital: ''
   });
   
   const [procurementInfo, setProcurementInfo] = useState({
@@ -68,7 +82,21 @@ const VendorProfile = () => {
     compliance_forms: '',
     regulatory_notes: '',
     last_audit_date: '',
-    next_audit_date: ''
+    next_audit_date: '',
+    // New fields
+    company_status: '',
+    date_of_balance_sheet: '',
+    date_of_last_agm: ''
+  });
+
+  // New state for directors
+  const [directorsInfo, setDirectorsInfo] = useState({
+    current_directors: [
+      { din: '', name: '', designation: '', appointment_date: '' }
+    ],
+    past_directors: [
+      { din: '', name: '', designation: '', appointment_date: '', cessation_date: '' }
+    ]
   });
 
   useEffect(() => {
@@ -100,7 +128,9 @@ const VendorProfile = () => {
         tax_id: vendor.tax_id || '',
         vat_id: vendor.vat_id || '',
         payment_terms: vendor.payment_terms || '',
-        currency: vendor.currency || 'USD'
+        currency: vendor.currency || 'USD',
+        authorised_capital: vendor.authorised_capital || '',
+        paid_up_capital: vendor.paid_up_capital || ''
       }));
 
       // Set procurement info
@@ -117,7 +147,10 @@ const VendorProfile = () => {
         ...prev,
         w9_status: vendor.w9_status || '',
         w8_ben_status: vendor.w8_ben_status || '',
-        w8_ben_e_status: vendor.w8_ben_e_status || ''
+        w8_ben_e_status: vendor.w8_ben_e_status || '',
+        company_status: vendor.company_status || '',
+        date_of_balance_sheet: vendor.date_of_balance_sheet || '',
+        date_of_last_agm: vendor.date_of_last_agm || ''
       }));
 
       // Fetch additional profile data
@@ -132,7 +165,10 @@ const VendorProfile = () => {
           ...prev,
           bank_name: profile.bank_name || '',
           account_number: profile.account_number || '',
-          routing_number: profile.routing_number || ''
+          routing_number: profile.routing_number || '',
+          account_type: profile.account_type || '',
+          swift_code: profile.swift_code || '',
+          bank_address: profile.bank_address || ''
         }));
         
         setProcurementInfo(prev => ({
@@ -149,6 +185,20 @@ const VendorProfile = () => {
           last_audit_date: profile.last_audit_date || '',
           next_audit_date: profile.next_audit_date || ''
         }));
+
+        // Fetch directors info if stored in profile or another table
+        if (profile.current_directors) {
+          setDirectorsInfo(prev => ({
+            ...prev,
+            current_directors: profile.current_directors
+          }));
+        }
+        if (profile.past_directors) {
+          setDirectorsInfo(prev => ({
+            ...prev,
+            past_directors: profile.past_directors
+          }));
+        }
       }
 
     } catch (error) {
@@ -195,7 +245,9 @@ const VendorProfile = () => {
           tax_id: financialInfo.tax_id,
           vat_id: financialInfo.vat_id,
           payment_terms: financialInfo.payment_terms,
-          currency: financialInfo.currency
+          currency: financialInfo.currency,
+          authorised_capital: financialInfo.authorised_capital,
+          paid_up_capital: financialInfo.paid_up_capital
         })
         .eq('vendor_id', vendorData.vendor_id);
 
@@ -210,7 +262,10 @@ const VendorProfile = () => {
           account_number: financialInfo.account_number,
           routing_number: financialInfo.routing_number,
           currency: financialInfo.currency,
-          payment_terms: financialInfo.payment_terms
+          payment_terms: financialInfo.payment_terms,
+          account_type: financialInfo.account_type,
+          swift_code: financialInfo.swift_code,
+          bank_address: financialInfo.bank_address
         });
 
       if (profileError) throw profileError;
@@ -289,7 +344,10 @@ const VendorProfile = () => {
         .update({
           w9_status: complianceInfo.w9_status,
           w8_ben_status: complianceInfo.w8_ben_status,
-          w8_ben_e_status: complianceInfo.w8_ben_e_status
+          w8_ben_e_status: complianceInfo.w8_ben_e_status,
+          company_status: complianceInfo.company_status,
+          date_of_balance_sheet: complianceInfo.date_of_balance_sheet,
+          date_of_last_agm: complianceInfo.date_of_last_agm
         })
         .eq('vendor_id', vendorData.vendor_id);
 
@@ -327,6 +385,70 @@ const VendorProfile = () => {
     }
   };
 
+  const saveDirectorsInfo = async () => {
+    setIsLoading(true);
+    try {
+      // Save directors info in vendor_profiles or a dedicated table
+      const { error } = await supabase
+        .from('vendor_profiles')
+        .upsert({
+          vendor_id: vendorData.vendor_id,
+          current_directors: directorsInfo.current_directors,
+          past_directors: directorsInfo.past_directors
+        });
+
+      if (error) throw error;
+
+      await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          email: vendorData.email,
+          vendorId: vendorData.vendor_id,
+          section: 'directors',
+          action: 'update'
+        }
+      });
+
+      toast.success('Directors information saved successfully');
+    } catch (error) {
+      console.error('Error saving directors info:', error);
+      toast.error('Failed to save directors information');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addCurrentDirector = () => {
+    setDirectorsInfo(prev => ({
+      ...prev,
+      current_directors: [...prev.current_directors, { din: '', name: '', designation: '', appointment_date: '' }]
+    }));
+  };
+
+  const addPastDirector = () => {
+    setDirectorsInfo(prev => ({
+      ...prev,
+      past_directors: [...prev.past_directors, { din: '', name: '', designation: '', appointment_date: '', cessation_date: '' }]
+    }));
+  };
+
+  const updateCurrentDirector = (index: number, field: string, value: string) => {
+    setDirectorsInfo(prev => ({
+      ...prev,
+      current_directors: prev.current_directors.map((director, i) => 
+        i === index ? { ...director, [field]: value } : director
+      )
+    }));
+  };
+
+  const updatePastDirector = (index: number, field: string, value: string) => {
+    setDirectorsInfo(prev => ({
+      ...prev,
+      past_directors: prev.past_directors.map((director, i) => 
+        i === index ? { ...director, [field]: value } : director
+      )
+    }));
+  };
+
   const handleLogout = () => {
     localStorage.removeItem('vendorUser');
     navigate('/vendor-auth');
@@ -346,8 +468,8 @@ const VendorProfile = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-lg border-b">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 bg-white shadow-lg border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-6">
             <div className="flex items-center space-x-3">
@@ -369,11 +491,11 @@ const VendorProfile = () => {
             </div>
           </div>
         </div>
-      </header>
+      </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="general" className="flex items-center gap-2">
               <User className="h-4 w-4" />
               General
@@ -390,6 +512,14 @@ const VendorProfile = () => {
               <Shield className="h-4 w-4" />
               Compliance
             </TabsTrigger>
+            <TabsTrigger value="directors" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Directors
+            </TabsTrigger>
+            <TabsTrigger value="past-directors" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Past Directors
+            </TabsTrigger>
           </TabsList>
 
           {/* General Information */}
@@ -400,6 +530,7 @@ const VendorProfile = () => {
                 <CardDescription>Basic company and contact information</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Basic Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>
                     <Label htmlFor="legal_entity_name">Legal Entity Name *</Label>
@@ -421,43 +552,143 @@ const VendorProfile = () => {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="contact_name">Contact Name *</Label>
+                    <Label htmlFor="cin_number">CIN Number</Label>
                     <Input
-                      id="contact_name"
-                      value={generalInfo.contact_name}
-                      onChange={(e) => setGeneralInfo({...generalInfo, contact_name: e.target.value})}
-                      placeholder="Enter contact name"
-                      required
+                      id="cin_number"
+                      value={generalInfo.cin_number}
+                      onChange={(e) => setGeneralInfo({...generalInfo, cin_number: e.target.value})}
+                      placeholder="Enter CIN number"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="email">Email Address *</Label>
+                    <Label htmlFor="registration_number">Registration Number</Label>
                     <Input
-                      id="email"
-                      type="email"
-                      value={generalInfo.email}
-                      onChange={(e) => setGeneralInfo({...generalInfo, email: e.target.value})}
-                      placeholder="Enter email address"
-                      required
+                      id="registration_number"
+                      value={generalInfo.registration_number}
+                      onChange={(e) => setGeneralInfo({...generalInfo, registration_number: e.target.value})}
+                      placeholder="Enter registration number"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="phone_number">Phone Number</Label>
+                    <Label htmlFor="date_of_incorporation">Date of Incorporation</Label>
                     <Input
-                      id="phone_number"
-                      value={generalInfo.phone_number}
-                      onChange={(e) => setGeneralInfo({...generalInfo, phone_number: e.target.value})}
-                      placeholder="Enter phone number"
+                      id="date_of_incorporation"
+                      type="date"
+                      value={generalInfo.date_of_incorporation}
+                      onChange={(e) => setGeneralInfo({...generalInfo, date_of_incorporation: e.target.value})}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="website">Website</Label>
+                    <Label htmlFor="listed_in_stock_exchange">Listed in Stock Exchange(s)</Label>
+                    <Select value={generalInfo.listed_in_stock_exchange} onValueChange={(value) => setGeneralInfo({...generalInfo, listed_in_stock_exchange: value})}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select Y/N" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="yes">Yes</SelectItem>
+                        <SelectItem value="no">No</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="category_of_company">Category of Company</Label>
                     <Input
-                      id="website"
-                      value={generalInfo.website}
-                      onChange={(e) => setGeneralInfo({...generalInfo, website: e.target.value})}
-                      placeholder="Enter website URL"
+                      id="category_of_company"
+                      value={generalInfo.category_of_company}
+                      onChange={(e) => setGeneralInfo({...generalInfo, category_of_company: e.target.value})}
+                      placeholder="e.g., Company limited by shares"
                     />
+                  </div>
+                  <div>
+                    <Label htmlFor="subcategory_of_company">Subcategory of Company</Label>
+                    <Input
+                      id="subcategory_of_company"
+                      value={generalInfo.subcategory_of_company}
+                      onChange={(e) => setGeneralInfo({...generalInfo, subcategory_of_company: e.target.value})}
+                      placeholder="e.g., Non-government company"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="class_of_company">Class of Company</Label>
+                    <Input
+                      id="class_of_company"
+                      value={generalInfo.class_of_company}
+                      onChange={(e) => setGeneralInfo({...generalInfo, class_of_company: e.target.value})}
+                      placeholder="e.g., Private"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="roc_name">ROC Name</Label>
+                    <Input
+                      id="roc_name"
+                      value={generalInfo.roc_name}
+                      onChange={(e) => setGeneralInfo({...generalInfo, roc_name: e.target.value})}
+                      placeholder="Enter ROC name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="roc_office">ROC Office</Label>
+                    <Input
+                      id="roc_office"
+                      value={generalInfo.roc_office}
+                      onChange={(e) => setGeneralInfo({...generalInfo, roc_office: e.target.value})}
+                      placeholder="Enter ROC office"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="rd_name_region">RD Name & Region</Label>
+                    <Input
+                      id="rd_name_region"
+                      value={generalInfo.rd_name_region}
+                      onChange={(e) => setGeneralInfo({...generalInfo, rd_name_region: e.target.value})}
+                      placeholder="Enter RD name and region"
+                    />
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">Contact Information</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label htmlFor="contact_name">Contact Name *</Label>
+                      <Input
+                        id="contact_name"
+                        value={generalInfo.contact_name}
+                        onChange={(e) => setGeneralInfo({...generalInfo, contact_name: e.target.value})}
+                        placeholder="Enter contact name"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="email">Email Address *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={generalInfo.email}
+                        onChange={(e) => setGeneralInfo({...generalInfo, email: e.target.value})}
+                        placeholder="Enter email address"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="phone_number">Phone Number</Label>
+                      <Input
+                        id="phone_number"
+                        value={generalInfo.phone_number}
+                        onChange={(e) => setGeneralInfo({...generalInfo, phone_number: e.target.value})}
+                        placeholder="Enter phone number"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="website">Website</Label>
+                      <Input
+                        id="website"
+                        value={generalInfo.website}
+                        onChange={(e) => setGeneralInfo({...generalInfo, website: e.target.value})}
+                        placeholder="Enter website URL"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -629,6 +860,24 @@ const VendorProfile = () => {
                       value={financialInfo.vat_id}
                       onChange={(e) => setFinancialInfo({...financialInfo, vat_id: e.target.value})}
                       placeholder="Enter VAT identification number"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="authorised_capital">Authorised Capital (Rs)</Label>
+                    <Input
+                      id="authorised_capital"
+                      value={financialInfo.authorised_capital}
+                      onChange={(e) => setFinancialInfo({...financialInfo, authorised_capital: e.target.value})}
+                      placeholder="Enter authorised capital"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="paid_up_capital">Paid up Capital (Rs)</Label>
+                    <Input
+                      id="paid_up_capital"
+                      value={financialInfo.paid_up_capital}
+                      onChange={(e) => setFinancialInfo({...financialInfo, paid_up_capital: e.target.value})}
+                      placeholder="Enter paid up capital"
                     />
                   </div>
                   <div>
@@ -807,7 +1056,7 @@ const VendorProfile = () => {
             </Card>
           </TabsContent>
 
-          {/* Compliance Information with Document Upload */}
+          {/* Compliance Information */}
           <TabsContent value="compliance">
             <Card>
               <CardHeader>
@@ -857,6 +1106,36 @@ const VendorProfile = () => {
                         <SelectItem value="expired">Expired</SelectItem>
                       </SelectContent>
                     </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <Label htmlFor="company_status">Company Status</Label>
+                    <Input
+                      id="company_status"
+                      value={complianceInfo.company_status}
+                      onChange={(e) => setComplianceInfo({...complianceInfo, company_status: e.target.value})}
+                      placeholder="e.g., Amalgamated"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="date_of_balance_sheet">Date of Balance Sheet</Label>
+                    <Input
+                      id="date_of_balance_sheet"
+                      type="date"
+                      value={complianceInfo.date_of_balance_sheet}
+                      onChange={(e) => setComplianceInfo({...complianceInfo, date_of_balance_sheet: e.target.value})}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="date_of_last_agm">Date of Last AGM</Label>
+                    <Input
+                      id="date_of_last_agm"
+                      type="date"
+                      value={complianceInfo.date_of_last_agm}
+                      onChange={(e) => setComplianceInfo({...complianceInfo, date_of_last_agm: e.target.value})}
+                    />
                   </div>
                 </div>
 
@@ -922,6 +1201,139 @@ const VendorProfile = () => {
 
             {/* Document Upload Section */}
             <DocumentUploadSection vendorId={vendorData.vendor_id} />
+          </TabsContent>
+
+          {/* Directors & Key Managerial Personnel */}
+          <TabsContent value="directors">
+            <Card>
+              <CardHeader>
+                <CardTitle>V. Directors & Key Managerial Personnel</CardTitle>
+                <CardDescription>Current directors and key personnel information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {directorsInfo.current_directors.map((director, index) => (
+                  <div key={index} className="border p-4 rounded-lg">
+                    <h4 className="font-semibold mb-4">Director {index + 1}</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`din_${index}`}>DIN</Label>
+                        <Input
+                          id={`din_${index}`}
+                          value={director.din}
+                          onChange={(e) => updateCurrentDirector(index, 'din', e.target.value)}
+                          placeholder="Enter DIN"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`name_${index}`}>Director Name</Label>
+                        <Input
+                          id={`name_${index}`}
+                          value={director.name}
+                          onChange={(e) => updateCurrentDirector(index, 'name', e.target.value)}
+                          placeholder="Enter director name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`designation_${index}`}>Designation</Label>
+                        <Input
+                          id={`designation_${index}`}
+                          value={director.designation}
+                          onChange={(e) => updateCurrentDirector(index, 'designation', e.target.value)}
+                          placeholder="Enter designation"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`appointment_date_${index}`}>Appointment Date</Label>
+                        <Input
+                          id={`appointment_date_${index}`}
+                          type="date"
+                          value={director.appointment_date}
+                          onChange={(e) => updateCurrentDirector(index, 'appointment_date', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button onClick={addCurrentDirector} variant="outline" className="w-full">
+                  Add Another Director
+                </Button>
+                <Button onClick={saveDirectorsInfo} disabled={isLoading} className="w-full mt-4">
+                  {isLoading ? 'Saving...' : 'Save Directors Information'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Past Directors & Key Managerial Personnel */}
+          <TabsContent value="past-directors">
+            <Card>
+              <CardHeader>
+                <CardTitle>VI. Past Directors & Key Managerial Personnel</CardTitle>
+                <CardDescription>Former directors and key personnel information</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {directorsInfo.past_directors.map((director, index) => (
+                  <div key={index} className="border p-4 rounded-lg">
+                    <h4 className="font-semibold mb-4">Past Director {index + 1}</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`past_din_${index}`}>DIN</Label>
+                        <Input
+                          id={`past_din_${index}`}
+                          value={director.din}
+                          onChange={(e) => updatePastDirector(index, 'din', e.target.value)}
+                          placeholder="Enter DIN"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`past_name_${index}`}>Director Name</Label>
+                        <Input
+                          id={`past_name_${index}`}
+                          value={director.name}
+                          onChange={(e) => updatePastDirector(index, 'name', e.target.value)}
+                          placeholder="Enter director name"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`past_designation_${index}`}>Designation</Label>
+                        <Input
+                          id={`past_designation_${index}`}
+                          value={director.designation}
+                          onChange={(e) => updatePastDirector(index, 'designation', e.target.value)}
+                          placeholder="Enter designation"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`past_appointment_date_${index}`}>Appointment Date</Label>
+                        <Input
+                          id={`past_appointment_date_${index}`}
+                          type="date"
+                          value={director.appointment_date}
+                          onChange={(e) => updatePastDirector(index, 'appointment_date', e.target.value)}
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`past_cessation_date_${index}`}>Cessation Date</Label>
+                        <Input
+                          id={`past_cessation_date_${index}`}
+                          type="date"
+                          value={director.cessation_date}
+                          onChange={(e) => updatePastDirector(index, 'cessation_date', e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                
+                <Button onClick={addPastDirector} variant="outline" className="w-full">
+                  Add Another Past Director
+                </Button>
+                <Button onClick={saveDirectorsInfo} disabled={isLoading} className="w-full mt-4">
+                  {isLoading ? 'Saving...' : 'Save Past Directors Information'}
+                </Button>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
