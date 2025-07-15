@@ -201,7 +201,7 @@ const PublicVendorDirectory = () => {
                     <SelectValue placeholder="Select Country" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Countries</SelectItem>
+                    <SelectItem value="all">All Countries</SelectItem>
                     {getUniqueCountries().map(country => (
                       <SelectItem key={country} value={country}>{country}</SelectItem>
                     ))}
@@ -214,7 +214,7 @@ const PublicVendorDirectory = () => {
                     <SelectValue placeholder="Select Type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Types</SelectItem>
+                    <SelectItem value="all">All Types</SelectItem>
                     {getUniqueTypes().map(type => (
                       <SelectItem key={type} value={type}>{type}</SelectItem>
                     ))}
@@ -227,7 +227,7 @@ const PublicVendorDirectory = () => {
                     <SelectValue placeholder="Select Status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">All Statuses</SelectItem>
+                    <SelectItem value="all">All Statuses</SelectItem>
                     <SelectItem value="approved">Approved</SelectItem>
                     <SelectItem value="pending">Pending</SelectItem>
                     <SelectItem value="rejected">Rejected</SelectItem>
