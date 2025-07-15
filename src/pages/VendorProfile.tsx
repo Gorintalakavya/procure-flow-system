@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,7 +121,38 @@ const VendorProfile = () => {
       if (error) throw error;
 
       setVendorData(vendor);
-      setGeneralInfo(vendor);
+      
+      // Set general info with all fields
+      setGeneralInfo({
+        legal_entity_name: vendor.legal_entity_name || '',
+        trade_name: vendor.trade_name || '',
+        contact_name: vendor.contact_name || '',
+        email: vendor.email || '',
+        phone_number: vendor.phone_number || '',
+        website: vendor.website || '',
+        street_address: vendor.street_address || '',
+        street_address_line2: vendor.street_address_line2 || '',
+        city: vendor.city || '',
+        state: vendor.state || '',
+        postal_code: vendor.postal_code || '',
+        country: vendor.country || '',
+        vendor_type: vendor.vendor_type || '',
+        year_established: vendor.year_established || '',
+        employee_count: vendor.employee_count || '',
+        annual_revenue: vendor.annual_revenue || '',
+        business_description: vendor.business_description || '',
+        products_services_description: vendor.products_services_description || '',
+        cin_number: vendor.cin_number || '',
+        roc_name: vendor.roc_name || '',
+        registration_number: vendor.registration_number || '',
+        date_of_incorporation: vendor.date_of_incorporation || '',
+        listed_in_stock_exchange: vendor.listed_in_stock_exchange || '',
+        category_of_company: vendor.category_of_company || '',
+        subcategory_of_company: vendor.subcategory_of_company || '',
+        class_of_company: vendor.class_of_company || '',
+        roc_office: vendor.roc_office || '',
+        rd_name_region: vendor.rd_name_region || ''
+      });
       
       // Set financial info
       setFinancialInfo(prev => ({
@@ -186,7 +218,7 @@ const VendorProfile = () => {
           next_audit_date: profile.next_audit_date || ''
         }));
 
-        // Fetch directors info if stored in profile or another table
+        // Fetch directors info if stored in profile
         if (profile.current_directors) {
           setDirectorsInfo(prev => ({
             ...prev,
@@ -495,32 +527,35 @@ const VendorProfile = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="general" className="flex items-center gap-2">
-              <User className="h-4 w-4" />
-              General
-            </TabsTrigger>
-            <TabsTrigger value="financial" className="flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Financial
-            </TabsTrigger>
-            <TabsTrigger value="procurement" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Procurement
-            </TabsTrigger>
-            <TabsTrigger value="compliance" className="flex items-center gap-2">
-              <Shield className="h-4 w-4" />
-              Compliance
-            </TabsTrigger>
-            <TabsTrigger value="directors" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Directors
-            </TabsTrigger>
-            <TabsTrigger value="past-directors" className="flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              Past Directors
-            </TabsTrigger>
-          </TabsList>
+          {/* Sticky Tab Navigation */}
+          <div className="sticky top-24 z-40 bg-white border-b pb-4 mb-6">
+            <TabsList className="grid w-full grid-cols-6">
+              <TabsTrigger value="general" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                General
+              </TabsTrigger>
+              <TabsTrigger value="financial" className="flex items-center gap-2">
+                <DollarSign className="h-4 w-4" />
+                Financial
+              </TabsTrigger>
+              <TabsTrigger value="procurement" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Procurement
+              </TabsTrigger>
+              <TabsTrigger value="compliance" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                Compliance
+              </TabsTrigger>
+              <TabsTrigger value="directors" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Directors
+              </TabsTrigger>
+              <TabsTrigger value="past-directors" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Past Directors
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           {/* General Information */}
           <TabsContent value="general">

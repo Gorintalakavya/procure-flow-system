@@ -946,6 +946,8 @@ export type Database = {
       vendor_profiles: {
         Row: {
           account_number: string | null
+          account_type: string | null
+          bank_address: string | null
           bank_name: string | null
           billing_address: string | null
           certifications: string | null
@@ -953,9 +955,11 @@ export type Database = {
           contract_details: string | null
           created_at: string | null
           currency: string | null
+          current_directors: Json | null
           id: string
           last_audit_date: string | null
           next_audit_date: string | null
+          past_directors: Json | null
           payment_terms: string | null
           primary_contact: string | null
           reconciliation_account: string | null
@@ -964,6 +968,7 @@ export type Database = {
           routing_number: string | null
           secondary_contact: string | null
           services_offered: string | null
+          swift_code: string | null
           tax_id: string | null
           updated_at: string | null
           user_id: string | null
@@ -971,6 +976,8 @@ export type Database = {
         }
         Insert: {
           account_number?: string | null
+          account_type?: string | null
+          bank_address?: string | null
           bank_name?: string | null
           billing_address?: string | null
           certifications?: string | null
@@ -978,9 +985,11 @@ export type Database = {
           contract_details?: string | null
           created_at?: string | null
           currency?: string | null
+          current_directors?: Json | null
           id?: string
           last_audit_date?: string | null
           next_audit_date?: string | null
+          past_directors?: Json | null
           payment_terms?: string | null
           primary_contact?: string | null
           reconciliation_account?: string | null
@@ -989,6 +998,7 @@ export type Database = {
           routing_number?: string | null
           secondary_contact?: string | null
           services_offered?: string | null
+          swift_code?: string | null
           tax_id?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -996,6 +1006,8 @@ export type Database = {
         }
         Update: {
           account_number?: string | null
+          account_type?: string | null
+          bank_address?: string | null
           bank_name?: string | null
           billing_address?: string | null
           certifications?: string | null
@@ -1003,9 +1015,11 @@ export type Database = {
           contract_details?: string | null
           created_at?: string | null
           currency?: string | null
+          current_directors?: Json | null
           id?: string
           last_audit_date?: string | null
           next_audit_date?: string | null
+          past_directors?: Json | null
           payment_terms?: string | null
           primary_contact?: string | null
           reconciliation_account?: string | null
@@ -1014,6 +1028,7 @@ export type Database = {
           routing_number?: string | null
           secondary_contact?: string | null
           services_offered?: string | null
+          swift_code?: string | null
           tax_id?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -1092,9 +1107,14 @@ export type Database = {
       vendors: {
         Row: {
           annual_revenue: string | null
+          authorised_capital: string | null
           bank_account_details: string | null
           business_description: string | null
+          category_of_company: string | null
+          cin_number: string | null
           city: string
+          class_of_company: string | null
+          company_status: string | null
           contact_name: string
           contact_phone: string | null
           contract_effective_date: string | null
@@ -1102,20 +1122,30 @@ export type Database = {
           country: string
           created_at: string | null
           currency: string | null
+          date_of_balance_sheet: string | null
+          date_of_incorporation: string | null
+          date_of_last_agm: string | null
           email: string
           employee_count: string | null
           id: string
           legal_entity_name: string
+          listed_in_stock_exchange: string | null
+          paid_up_capital: string | null
           payment_terms: string | null
           phone_number: string | null
           postal_code: string
           products_services_description: string | null
+          rd_name_region: string | null
           reconciliation_account: string | null
+          registration_number: string | null
           registration_status: string | null
           relationship_owner: string | null
+          roc_name: string | null
+          roc_office: string | null
           state: string
           street_address: string
           street_address_line2: string | null
+          subcategory_of_company: string | null
           tax_id: string | null
           trade_name: string | null
           updated_at: string | null
@@ -1130,9 +1160,14 @@ export type Database = {
         }
         Insert: {
           annual_revenue?: string | null
+          authorised_capital?: string | null
           bank_account_details?: string | null
           business_description?: string | null
+          category_of_company?: string | null
+          cin_number?: string | null
           city: string
+          class_of_company?: string | null
+          company_status?: string | null
           contact_name: string
           contact_phone?: string | null
           contract_effective_date?: string | null
@@ -1140,20 +1175,30 @@ export type Database = {
           country: string
           created_at?: string | null
           currency?: string | null
+          date_of_balance_sheet?: string | null
+          date_of_incorporation?: string | null
+          date_of_last_agm?: string | null
           email: string
           employee_count?: string | null
           id?: string
           legal_entity_name: string
+          listed_in_stock_exchange?: string | null
+          paid_up_capital?: string | null
           payment_terms?: string | null
           phone_number?: string | null
           postal_code: string
           products_services_description?: string | null
+          rd_name_region?: string | null
           reconciliation_account?: string | null
+          registration_number?: string | null
           registration_status?: string | null
           relationship_owner?: string | null
+          roc_name?: string | null
+          roc_office?: string | null
           state: string
           street_address: string
           street_address_line2?: string | null
+          subcategory_of_company?: string | null
           tax_id?: string | null
           trade_name?: string | null
           updated_at?: string | null
@@ -1168,9 +1213,14 @@ export type Database = {
         }
         Update: {
           annual_revenue?: string | null
+          authorised_capital?: string | null
           bank_account_details?: string | null
           business_description?: string | null
+          category_of_company?: string | null
+          cin_number?: string | null
           city?: string
+          class_of_company?: string | null
+          company_status?: string | null
           contact_name?: string
           contact_phone?: string | null
           contract_effective_date?: string | null
@@ -1178,20 +1228,30 @@ export type Database = {
           country?: string
           created_at?: string | null
           currency?: string | null
+          date_of_balance_sheet?: string | null
+          date_of_incorporation?: string | null
+          date_of_last_agm?: string | null
           email?: string
           employee_count?: string | null
           id?: string
           legal_entity_name?: string
+          listed_in_stock_exchange?: string | null
+          paid_up_capital?: string | null
           payment_terms?: string | null
           phone_number?: string | null
           postal_code?: string
           products_services_description?: string | null
+          rd_name_region?: string | null
           reconciliation_account?: string | null
+          registration_number?: string | null
           registration_status?: string | null
           relationship_owner?: string | null
+          roc_name?: string | null
+          roc_office?: string | null
           state?: string
           street_address?: string
           street_address_line2?: string | null
+          subcategory_of_company?: string | null
           tax_id?: string | null
           trade_name?: string | null
           updated_at?: string | null
