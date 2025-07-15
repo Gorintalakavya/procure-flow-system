@@ -65,6 +65,22 @@ const AdminLogin = () => {
     }
   };
 
+  const logAdminActivity = async (action: string, adminId: string, details: any = {}) => {
+    try {
+      await supabase
+        .from('audit_logs')
+        .insert({
+          action,
+          entity_type: 'admin_auth',
+          entity_id: adminId,
+          new_values: details,
+          timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+      console.error('Error logging admin activity:', error);
+    }
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -114,6 +130,12 @@ const AdminLogin = () => {
         adminId: adminId,
         isAuthenticated: true
       }));
+
+      // Log the sign-in activity
+      await logAdminActivity('admin_signin', adminId, {
+        email: adminData.email,
+        timestamp: new Date().toISOString()
+      });
 
       await sendAdminConfirmationEmail(adminData.email, 'signin', adminId);
       toast.success('Admin login successful!');
@@ -209,6 +231,12 @@ const AdminLogin = () => {
         isAuthenticated: true
       }));
 
+      // Log the signup activity
+      await logAdminActivity('admin_signup', adminId, {
+        email: newAdmin.email,
+        timestamp: new Date().toISOString()
+      });
+
       console.log('✅ Admin account created successfully');
       await sendAdminConfirmationEmail(newAdmin.email, 'signup', adminId);
       toast.success('Admin account created successfully!');
@@ -223,178 +251,188 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100 flex items-center justify-center">
-      <div className="max-w-md w-full mx-4">
-        <div className="mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => navigate('/')}
-            className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Home
-          </Button>
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100">
+      {/* Sticky Header */}
+      <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                onClick={() => navigate('/')}
+                className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                Back to Home
+              </Button>
+              <div className="flex items-center space-x-3">
+                <Shield className="h-8 w-8 text-red-600" />
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
+                  <p className="text-sm text-slate-600">Administrative access to procurement portal</p>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        <div className="text-center mb-8">
-          <Shield className="h-12 w-12 text-red-600 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-slate-900">Admin Portal</h1>
-          <p className="text-slate-600 mt-2">Administrative access to procurement portal</p>
+      <div className="flex items-center justify-center py-8">
+        <div className="max-w-md w-full mx-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-center">Admin Authentication</CardTitle>
+              <CardDescription className="text-center">
+                Sign in to your admin account or create a new one
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Tabs defaultValue="signin" className="w-full">
+                <TabsList className="grid w-full grid-cols-2">
+                  <TabsTrigger value="signin">Sign In</TabsTrigger>
+                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="signin">
+                  <form onSubmit={handleSignIn} className="space-y-4">
+                    <div>
+                      <Label htmlFor="admin-signin-email">Email Address</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="admin-signin-email"
+                          type="email"
+                          value={loginData.email}
+                          onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="Enter your admin email"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="admin-signin-password">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="admin-signin-password"
+                          type="password"
+                          value={loginData.password}
+                          onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                          placeholder="Enter your password"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <Button 
+                      type="submit" 
+                      className="w-full"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Signing In...' : 'Sign In'}
+                    </Button>
+                  </form>
+                </TabsContent>
+
+                <TabsContent value="signup">
+                  <form onSubmit={handleSignUp} className="space-y-4">
+                    <div>
+                      <Label htmlFor="admin-signup-name">Full Name</Label>
+                      <div className="relative">
+                        <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="admin-signup-name"
+                          type="text"
+                          value={signupData.name}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, name: e.target.value }))}
+                          placeholder="Enter your full name"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="admin-signup-email">Email Address</Label>
+                      <div className="relative">
+                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="admin-signup-email"
+                          type="email"
+                          value={signupData.email}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, email: e.target.value }))}
+                          placeholder="Enter your email address"
+                          className="pl-10"
+                          required
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="admin-signup-role">Role</Label>
+                      <Select value={signupData.role} onValueChange={(value) => setSignupData(prev => ({ ...prev, role: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="Procurement Officer">Procurement Officer</SelectItem>
+                          <SelectItem value="Finance Team">Finance Team</SelectItem>
+                          <SelectItem value="Vendor">Vendor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="admin-signup-password">Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="admin-signup-password"
+                          type="password"
+                          value={signupData.password}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
+                          placeholder="Create a password (min 6 characters)"
+                          className="pl-10"
+                          required
+                          minLength={6}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="admin-signup-confirm-password">Confirm Password</Label>
+                      <div className="relative">
+                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          id="admin-signup-confirm-password"
+                          type="password"
+                          value={signupData.confirmPassword}
+                          onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          placeholder="Confirm your password"
+                          className="pl-10"
+                          required
+                          minLength={6}
+                        />
+                      </div>
+                    </div>
+
+                    <Button 
+                      type="submit" 
+                      className="w-full"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? 'Creating Account...' : 'Create Admin Account'}
+                    </Button>
+                  </form>
+                </TabsContent>
+              </Tabs>
+            </CardContent>
+          </Card>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Admin Authentication</CardTitle>
-            <CardDescription className="text-center">
-              Sign in to your admin account or create a new one
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Tabs defaultValue="signin" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="signin">Sign In</TabsTrigger>
-                <TabsTrigger value="signup">Sign Up</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="signin">
-                <form onSubmit={handleSignIn} className="space-y-4">
-                  <div>
-                    <Label htmlFor="admin-signin-email">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="admin-signin-email"
-                        type="email"
-                        value={loginData.email}
-                        onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="Enter your admin email"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="admin-signin-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="admin-signin-password"
-                        type="password"
-                        value={loginData.password}
-                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                        placeholder="Enter your password"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Signing In...' : 'Sign In'}
-                  </Button>
-                </form>
-              </TabsContent>
-
-              <TabsContent value="signup">
-                <form onSubmit={handleSignUp} className="space-y-4">
-                  <div>
-                    <Label htmlFor="admin-signup-name">Full Name</Label>
-                    <div className="relative">
-                      <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="admin-signup-name"
-                        type="text"
-                        value={signupData.name}
-                        onChange={(e) => setSignupData(prev => ({ ...prev, name: e.target.value }))}
-                        placeholder="Enter your full name"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="admin-signup-email">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="admin-signup-email"
-                        type="email"
-                        value={signupData.email}
-                        onChange={(e) => setSignupData(prev => ({ ...prev, email: e.target.value }))}
-                        placeholder="Enter your email address"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="admin-signup-role">Role</Label>
-                    <Select value={signupData.role} onValueChange={(value) => setSignupData(prev => ({ ...prev, role: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select your role" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="Admin">Admin</SelectItem>
-                        <SelectItem value="Procurement Officer">Procurement Officer</SelectItem>
-                        <SelectItem value="Finance Team">Finance Team</SelectItem>
-                        <SelectItem value="Vendor">Vendor</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="admin-signup-password">Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="admin-signup-password"
-                        type="password"
-                        value={signupData.password}
-                        onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
-                        placeholder="Create a password (min 6 characters)"
-                        className="pl-10"
-                        required
-                        minLength={6}
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="admin-signup-confirm-password">Confirm Password</Label>
-                    <div className="relative">
-                      <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="admin-signup-confirm-password"
-                        type="password"
-                        value={signupData.confirmPassword}
-                        onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                        placeholder="Confirm your password"
-                        className="pl-10"
-                        required
-                        minLength={6}
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Creating Account...' : 'Create Admin Account'}
-                  </Button>
-                </form>
-              </TabsContent>
-            </Tabs>
-          </CardContent>
-        </Card>
       </div>
     </div>
   );
