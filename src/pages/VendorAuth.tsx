@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -36,7 +35,7 @@ const VendorAuth = () => {
       setSignupData(prev => ({
         ...prev,
         vendorId: vendor.vendorId,
-        email: vendor.email
+        email: vendor.email || '' // Allow email to be editable even if empty
       }));
     }
   }, []);
@@ -89,7 +88,6 @@ const VendorAuth = () => {
     try {
       console.log('🔐 Vendor sign in attempt:', loginData.email);
 
-      // Check if user exists and credentials are correct
       const { data: userData, error: userError } = await supabase
         .from('users')
         .select('*')
@@ -104,7 +102,6 @@ const VendorAuth = () => {
         return;
       }
 
-      // Get vendor details
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
         .select('*')
@@ -117,7 +114,6 @@ const VendorAuth = () => {
         return;
       }
 
-      // Store user session data
       localStorage.setItem('vendorUser', JSON.stringify({
         id: userData.id,
         email: userData.email,
@@ -126,19 +122,16 @@ const VendorAuth = () => {
         vendor: vendorData
       }));
 
-      // Log the sign-in activity
       await logUserActivity('vendor_signin', userData.vendor_id, {
         email: userData.email,
         timestamp: new Date().toISOString()
       });
 
-      // Send confirmation email
       await sendConfirmationEmail(userData.email, userData.vendor_id || '', 'signin');
       
       console.log('✅ Vendor login successful');
       toast.success('Login successful! Redirecting to your profile...');
       
-      // Navigate to vendor profile
       setTimeout(() => {
         navigate('/vendor-profile');
       }, 1000);
@@ -179,7 +172,6 @@ const VendorAuth = () => {
     try {
       console.log('📝 Vendor signup attempt:', signupData.email);
 
-      // Check if user already exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('email')
@@ -191,7 +183,6 @@ const VendorAuth = () => {
         return;
       }
 
-      // Verify vendor exists
       const { data: vendorData, error: vendorError } = await supabase
         .from('vendors')
         .select('*')
@@ -203,7 +194,14 @@ const VendorAuth = () => {
         return;
       }
 
-      // Create user account
+      // Update vendor with email if it was empty
+      if (!vendorData.email || vendorData.email !== signupData.email) {
+        await supabase
+          .from('vendors')
+          .update({ email: signupData.email })
+          .eq('vendor_id', signupData.vendorId);
+      }
+
       const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert({
@@ -221,40 +219,34 @@ const VendorAuth = () => {
         return;
       }
 
-      // Update vendor status to 'in_progress' after account creation
       await supabase
         .from('vendors')
         .update({ 
-          registration_status: 'in_progress',
+          registration_status: 'pending',
           updated_at: new Date().toISOString()
         })
         .eq('vendor_id', signupData.vendorId);
 
-      // Store user session data
       localStorage.setItem('vendorUser', JSON.stringify({
         id: newUser.id,
         email: newUser.email,
         vendorId: newUser.vendor_id,
         isAuthenticated: true,
-        vendor: vendorData
+        vendor: { ...vendorData, email: signupData.email }
       }));
 
-      // Log the signup activity
       await logUserActivity('vendor_signup', newUser.vendor_id, {
         email: newUser.email,
         timestamp: new Date().toISOString()
       });
 
-      // Send confirmation email
       await sendConfirmationEmail(newUser.email, newUser.vendor_id || '', 'signup');
       
       console.log('✅ Vendor account created successfully');
       toast.success('Account created successfully! Confirmation email sent.');
       
-      // Clear pending vendor data
       localStorage.removeItem('pendingVendor');
       
-      // Navigate to vendor profile
       setTimeout(() => {
         navigate('/vendor-profile');
       }, 1000);
@@ -276,7 +268,6 @@ const VendorAuth = () => {
 
     setIsLoading(true);
     try {
-      // Check if user exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('email, vendor_id')
@@ -301,7 +292,6 @@ const VendorAuth = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {/* Sticky Header */}
       <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -384,7 +374,6 @@ const VendorAuth = () => {
                           placeholder="Enter your email address"
                           className="pl-10"
                           required
-                          readOnly={!!pendingVendor}
                         />
                       </div>
                     </div>

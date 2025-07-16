@@ -4,13 +4,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ArrowLeft, Building2, Mail, Phone, Globe, MapPin, FileText, Upload, Check, X, Edit2, Save } from "lucide-react";
+import { ArrowLeft, Building2, Mail, Phone, Globe, MapPin, FileText, Upload, Check, X } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import VendorProfileEditor from "@/components/VendorProfileEditor";
 
 interface VendorData {
   vendor_id: string;
@@ -31,6 +31,16 @@ interface VendorData {
   operating_status?: string;
   stock_symbol?: string;
   duns_number?: string;
+  contact_name?: string;
+  street_address?: string;
+  street_address_line2?: string;
+  postal_code?: string;
+  tax_id?: string;
+  products_services_description?: string;
+  relationship_owner?: string;
+  currency?: string;
+  payment_terms?: string;
+  bank_account_details?: string;
 }
 
 interface VerificationDocs {
@@ -45,8 +55,6 @@ const VendorProfile = () => {
   const [vendorData, setVendorData] = useState<VendorData | null>(null);
   const [verificationDocs, setVerificationDocs] = useState<VerificationDocs>({});
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState<Partial<VendorData>>({});
 
   useEffect(() => {
     fetchVendorData();
@@ -54,14 +62,14 @@ const VendorProfile = () => {
 
   const fetchVendorData = async () => {
     try {
-      const pendingVendor = localStorage.getItem('pendingVendor');
-      if (!pendingVendor) {
+      const vendorUser = localStorage.getItem('vendorUser');
+      if (!vendorUser) {
         toast.error('No vendor data found');
         navigate('/vendor-auth');
         return;
       }
 
-      const { vendorId } = JSON.parse(pendingVendor);
+      const { vendorId } = JSON.parse(vendorUser);
 
       const { data: vendor, error: vendorError } = await supabase
         .from('vendors')
@@ -72,7 +80,6 @@ const VendorProfile = () => {
       if (vendorError) throw vendorError;
 
       setVendorData(vendor);
-      setEditedData(vendor);
 
       // Fetch verification documents
       const { data: docs, error: docsError } = await supabase
@@ -93,32 +100,14 @@ const VendorProfile = () => {
     }
   };
 
-  const handleSave = async () => {
-    if (!vendorData) return;
-
-    try {
-      const { error } = await supabase
-        .from('vendors')
-        .update(editedData)
-        .eq('vendor_id', vendorData.vendor_id);
-
-      if (error) throw error;
-
-      setVendorData({ ...vendorData, ...editedData });
-      setIsEditing(false);
-      toast.success('Profile updated successfully');
-    } catch (error) {
-      console.error('Error updating profile:', error);
-      toast.error('Failed to update profile');
-    }
+  const handleVendorUpdate = (updatedVendor: VendorData) => {
+    setVendorData(updatedVendor);
   };
 
   const handleDocumentUpload = async (field: keyof VerificationDocs, file: File) => {
     if (!vendorData) return;
 
     try {
-      // In a real application, you would upload the file to Supabase Storage
-      // For now, we'll just store the filename
       const updatedDocs = {
         ...verificationDocs,
         [field]: file.name
@@ -195,34 +184,17 @@ const VendorProfile = () => {
             </div>
             <div className="flex items-center gap-3">
               {getStatusBadge(vendorData.registration_status)}
-              {!isEditing ? (
-                <Button onClick={() => setIsEditing(true)} className="flex items-center gap-2">
-                  <Edit2 className="h-4 w-4" />
-                  Edit Profile
-                </Button>
-              ) : (
-                <div className="flex gap-2">
-                  <Button onClick={handleSave} className="flex items-center gap-2">
-                    <Save className="h-4 w-4" />
-                    Save Changes
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    onClick={() => {
-                      setIsEditing(false);
-                      setEditedData(vendorData);
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
         </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <VendorProfileEditor 
+          vendor={vendorData} 
+          onUpdate={handleVendorUpdate} 
+        />
+
         <Tabs defaultValue="overview" className="space-y-6">
           <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -243,27 +215,13 @@ const VendorProfile = () => {
                 <CardContent className="space-y-4">
                   <div>
                     <Label>Legal Entity Name</Label>
-                    {isEditing ? (
-                      <Input
-                        value={editedData.legal_entity_name || ''}
-                        onChange={(e) => setEditedData(prev => ({ ...prev, legal_entity_name: e.target.value }))}
-                      />
-                    ) : (
-                      <p className="text-lg font-medium">{vendorData.legal_entity_name}</p>
-                    )}
+                    <p className="text-lg font-medium">{vendorData.legal_entity_name}</p>
                   </div>
                   
-                  {(vendorData.trade_name || isEditing) && (
+                  {vendorData.trade_name && (
                     <div>
                       <Label>Trade Name (DBA)</Label>
-                      {isEditing ? (
-                        <Input
-                          value={editedData.trade_name || ''}
-                          onChange={(e) => setEditedData(prev => ({ ...prev, trade_name: e.target.value }))}
-                        />
-                      ) : (
-                        <p>{vendorData.trade_name}</p>
-                      )}
+                      <p>{vendorData.trade_name}</p>
                     </div>
                   )}
 
@@ -286,14 +244,7 @@ const VendorProfile = () => {
                   {vendorData.business_description && (
                     <div>
                       <Label>About the Company</Label>
-                      {isEditing ? (
-                        <Textarea
-                          value={editedData.business_description || ''}
-                          onChange={(e) => setEditedData(prev => ({ ...prev, business_description: e.target.value }))}
-                        />
-                      ) : (
-                        <p className="text-gray-700">{vendorData.business_description}</p>
-                      )}
+                      <p className="text-gray-700">{vendorData.business_description}</p>
                     </div>
                   )}
                 </CardContent>
@@ -405,8 +356,12 @@ const VendorProfile = () => {
                       <MapPin className="h-4 w-4 text-gray-500 mt-1" />
                       <div>
                         <Label>Location</Label>
-                        <p>{vendorData.city}, {vendorData.state}</p>
-                        <p className="text-sm text-gray-600">{vendorData.country}</p>
+                        <div className="space-y-1">
+                          {vendorData.street_address && <p>{vendorData.street_address}</p>}
+                          {vendorData.street_address_line2 && <p>{vendorData.street_address_line2}</p>}
+                          <p>{vendorData.city}, {vendorData.state} {vendorData.postal_code}</p>
+                          <p className="text-sm text-gray-600">{vendorData.country}</p>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -443,6 +398,13 @@ const VendorProfile = () => {
                         <p>{vendorData.annual_revenue}</p>
                       </div>
                     )}
+
+                    {vendorData.tax_id && (
+                      <div>
+                        <Label>Tax ID</Label>
+                        <p className="font-mono">{vendorData.tax_id}</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-4">
@@ -461,6 +423,13 @@ const VendorProfile = () => {
                         </Badge>
                       </div>
                     )}
+
+                    {vendorData.currency && (
+                      <div>
+                        <Label>Currency</Label>
+                        <p>{vendorData.currency}</p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -469,6 +438,15 @@ const VendorProfile = () => {
                     <Label>Business Description</Label>
                     <p className="mt-2 text-gray-700 leading-relaxed">
                       {vendorData.business_description}
+                    </p>
+                  </div>
+                )}
+
+                {vendorData.products_services_description && (
+                  <div className="mt-6">
+                    <Label>Products/Services Description</Label>
+                    <p className="mt-2 text-gray-700 leading-relaxed">
+                      {vendorData.products_services_description}
                     </p>
                   </div>
                 )}

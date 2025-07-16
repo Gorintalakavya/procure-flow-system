@@ -3,12 +3,14 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
 import { Users, Building2, FileText, Bell, TrendingUp, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import AdminVendorManagement from "@/components/AdminVendorManagement";
+import AdminAnalytics from "@/components/AdminAnalytics";
+import AdminNotifications from "@/components/AdminNotifications";
+import AdminSettings from "@/components/AdminSettings";
 
 interface DashboardStats {
   totalVendors: number;
@@ -176,36 +178,15 @@ const AdminDashboard = () => {
           </TabsContent>
 
           <TabsContent value="analytics">
-            <Card>
-              <CardHeader>
-                <CardTitle>Analytics & Reporting</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">Analytics dashboard coming soon...</p>
-              </CardContent>
-            </Card>
+            <AdminAnalytics />
           </TabsContent>
 
           <TabsContent value="notifications">
-            <Card>
-              <CardHeader>
-                <CardTitle>Notification Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">Notification settings coming soon...</p>
-              </CardContent>
-            </Card>
+            <AdminNotifications />
           </TabsContent>
 
           <TabsContent value="settings">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Settings</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-600">System configuration coming soon...</p>
-              </CardContent>
-            </Card>
+            <AdminSettings />
           </TabsContent>
         </Tabs>
       </div>

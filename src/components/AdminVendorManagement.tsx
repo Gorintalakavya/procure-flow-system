@@ -12,10 +12,13 @@ import { Label } from "@/components/ui/label";
 import { Search, Eye, Edit, Check, X, Mail, Download, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import VendorDetailsModal from "./VendorDetailsModal";
+import VendorProfileEditor from "./VendorProfileEditor";
 
 interface Vendor {
   vendor_id: string;
   legal_entity_name: string;
+  trade_name?: string;
   email: string;
   registration_status: string;
   vendor_type: string;
@@ -23,6 +26,17 @@ interface Vendor {
   state: string;
   country: string;
   created_at: string;
+  phone_number?: string;
+  website?: string;
+  business_description?: string;
+  year_established?: string;
+  employee_count?: string;
+  annual_revenue?: string;
+  operating_status?: string;
+  stock_symbol?: string;
+  duns_number?: string;
+  contact_name?: string;
+  street_address?: string;
 }
 
 const AdminVendorManagement = () => {
@@ -33,6 +47,8 @@ const AdminVendorManagement = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [reviewNotes, setReviewNotes] = useState('');
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
 
   useEffect(() => {
     fetchVendors();
@@ -46,7 +62,7 @@ const AdminVendorManagement = () => {
     try {
       const { data, error } = await supabase
         .from('vendors')
-        .select('vendor_id, legal_entity_name, email, registration_status, vendor_type, city, state, country, created_at')
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -87,7 +103,6 @@ const AdminVendorManagement = () => {
 
       if (error) throw error;
 
-      // Log the status change
       await supabase
         .from('audit_logs')
         .insert({
@@ -100,7 +115,6 @@ const AdminVendorManagement = () => {
           user_agent: navigator.userAgent
         });
 
-      // Send notification email
       const vendor = vendors.find(v => v.vendor_id === vendorId);
       if (vendor) {
         await supabase.functions.invoke('send-confirmation-email', {
@@ -122,6 +136,11 @@ const AdminVendorManagement = () => {
       console.error('Error updating vendor status:', error);
       toast.error('Failed to update vendor status');
     }
+  };
+
+  const handleVendorUpdate = (updatedVendor: Vendor) => {
+    setVendors(prev => prev.map(v => v.vendor_id === updatedVendor.vendor_id ? updatedVendor : v));
+    setEditingVendor(null);
   };
 
   const exportToCSV = () => {
@@ -242,6 +261,23 @@ const AdminVendorManagement = () => {
                   <TableCell>{new Date(vendor.created_at).toLocaleDateString()}</TableCell>
                   <TableCell>
                     <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedVendor(vendor);
+                          setShowDetailsModal(true);
+                        }}
+                      >
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setEditingVendor(vendor)}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
                       <Dialog>
                         <DialogTrigger asChild>
                           <Button
@@ -249,7 +285,7 @@ const AdminVendorManagement = () => {
                             size="sm"
                             onClick={() => setSelectedVendor(vendor)}
                           >
-                            <Eye className="h-4 w-4" />
+                            Review
                           </Button>
                         </DialogTrigger>
                         <DialogContent className="max-w-md">
@@ -310,6 +346,25 @@ const AdminVendorManagement = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Vendor Details Modal */}
+      <VendorDetailsModal
+        vendor={selectedVendor}
+        isOpen={showDetailsModal}
+        onClose={() => {
+          setShowDetailsModal(false);
+          setSelectedVendor(null);
+        }}
+      />
+
+      {/* Edit Vendor Modal */}
+      {editingVendor && (
+        <VendorProfileEditor
+          vendor={editingVendor}
+          onUpdate={handleVendorUpdate}
+          isAdmin={true}
+        />
+      )}
     </div>
   );
 };
