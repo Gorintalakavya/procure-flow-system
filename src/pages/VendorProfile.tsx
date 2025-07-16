@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, ArrowLeft } from "lucide-react";
+import { CalendarIcon, ArrowLeft, Upload } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -64,6 +63,13 @@ interface ComplianceInfo {
   next_audit_date: Date | null;
 }
 
+interface VerificationDocs {
+  ein_verification_letter: string;
+  articles_of_incorporation: string;
+  business_licenses: string;
+  w9_form: string;
+}
+
 const VendorProfile = () => {
   const navigate = useNavigate();
   const [vendor, setVendor] = useState<any>(null);
@@ -115,6 +121,13 @@ const VendorProfile = () => {
     next_audit_date: null
   });
 
+  const [verificationDocs, setVerificationDocs] = useState<VerificationDocs>({
+    ein_verification_letter: '',
+    articles_of_incorporation: '',
+    business_licenses: '',
+    w9_form: ''
+  });
+
   useEffect(() => {
     loadVendorData();
   }, []);
@@ -159,8 +172,14 @@ const VendorProfile = () => {
         .eq('user_id', vendorData.id)
         .maybeSingle();
 
+      // Get verification documents
+      const { data: verificationData } = await supabase
+        .from('verification_documents')
+        .select('*')
+        .eq('vendor_id', vendorData.vendor_id)
+        .maybeSingle();
+
       if (profile) {
-        // Load overview info
         setOverviewInfo({
           company_description: profile.company_description || vendorData.business_description || '',
           ranking: profile.ranking || '',
@@ -170,7 +189,6 @@ const VendorProfile = () => {
           date_of_incorporation: profile.date_of_incorporation ? new Date(profile.date_of_incorporation) : null
         });
         
-        // Load financial info
         setFinancialInfo({
           bank_name: profile.bank_name || '',
           account_number: profile.account_number || '',
@@ -189,7 +207,6 @@ const VendorProfile = () => {
           esg_industry_average: profile.esg_industry_average || ''
         });
         
-        // Load procurement info
         setProcurementInfo({
           primary_contact: profile.primary_contact || '',
           secondary_contact: profile.secondary_contact || '',
@@ -199,13 +216,21 @@ const VendorProfile = () => {
           billing_address: profile.billing_address || ''
         });
         
-        // Load compliance info
         setComplianceInfo({
           certifications: profile.certifications || '',
           compliance_forms: profile.compliance_forms || '',
           regulatory_notes: profile.regulatory_notes || '',
           last_audit_date: profile.last_audit_date ? new Date(profile.last_audit_date) : null,
           next_audit_date: profile.next_audit_date ? new Date(profile.next_audit_date) : null
+        });
+      }
+
+      if (verificationData) {
+        setVerificationDocs({
+          ein_verification_letter: verificationData.ein_verification_letter || '',
+          articles_of_incorporation: verificationData.articles_of_incorporation || '',
+          business_licenses: verificationData.business_licenses || '',
+          w9_form: verificationData.w9_form || ''
         });
       }
     } catch (error) {
@@ -340,6 +365,33 @@ const VendorProfile = () => {
     }
   };
 
+  const saveVerificationDocs = async () => {
+    if (!vendor) return;
+    
+    try {
+      const { error: verificationError } = await supabase
+        .from('verification_documents')
+        .upsert({
+          vendor_id: vendor.vendor_id,
+          ein_verification_letter: verificationDocs.ein_verification_letter,
+          articles_of_incorporation: verificationDocs.articles_of_incorporation,
+          business_licenses: verificationDocs.business_licenses,
+          w9_form: verificationDocs.w9_form
+        });
+
+      if (verificationError) {
+        console.error('Error saving verification documents:', verificationError);
+        toast.error('Error saving verification documents');
+        return;
+      }
+
+      toast.success('Verification documents saved successfully');
+    } catch (error) {
+      console.error('Error saving verification documents:', error);
+      toast.error('Error saving verification documents');
+    }
+  };
+
   if (loading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
@@ -352,7 +404,8 @@ const VendorProfile = () => {
     overview: 'Overview',
     financial: 'Financial Information',
     procurement: 'Procurement Information',
-    compliance: 'Compliance & Audit'
+    compliance: 'Compliance & Audit',
+    verification: 'Verification Documents'
   };
 
   return (
@@ -778,6 +831,81 @@ const VendorProfile = () => {
             </div>
             <Button onClick={saveComplianceInfo} className="w-full">
               Save Compliance Information
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Verification Documents */}
+      {activeSection === 'verification' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Verification Documents</CardTitle>
+            <CardDescription>Upload and manage verification documents</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="ein_verification_letter">EIN Verification Letter (Form SS-4)</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="ein_verification_letter"
+                  value={verificationDocs.ein_verification_letter}
+                  onChange={(e) => setVerificationDocs(prev => ({ ...prev, ein_verification_letter: e.target.value }))}
+                  placeholder="Document URL or path"
+                />
+                <Button variant="outline" size="sm">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="articles_of_incorporation">Articles of Incorporation</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="articles_of_incorporation"
+                  value={verificationDocs.articles_of_incorporation}
+                  onChange={(e) => setVerificationDocs(prev => ({ ...prev, articles_of_incorporation: e.target.value }))}
+                  placeholder="Document URL or path"
+                />
+                <Button variant="outline" size="sm">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="business_licenses">Business Licenses or State Registration</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="business_licenses"
+                  value={verificationDocs.business_licenses}
+                  onChange={(e) => setVerificationDocs(prev => ({ ...prev, business_licenses: e.target.value }))}
+                  placeholder="Document URL or path"
+                />
+                <Button variant="outline" size="sm">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="w9_form">W-9 Form Upload</Label>
+              <div className="flex items-center space-x-2">
+                <Input
+                  id="w9_form"
+                  value={verificationDocs.w9_form}
+                  onChange={(e) => setVerificationDocs(prev => ({ ...prev, w9_form: e.target.value }))}
+                  placeholder="Document URL or path"
+                />
+                <Button variant="outline" size="sm">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload
+                </Button>
+              </div>
+            </div>
+            <Button onClick={saveVerificationDocs} className="w-full">
+              Save Verification Documents
             </Button>
           </CardContent>
         </Card>

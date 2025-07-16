@@ -1153,10 +1153,12 @@ export type Database = {
           country: string
           created_at: string | null
           currency: string | null
+          duns_number: string | null
           email: string
           employee_count: string | null
           id: string
           legal_entity_name: string
+          operating_status: string | null
           payment_terms: string | null
           phone_number: string | null
           postal_code: string
@@ -1165,6 +1167,7 @@ export type Database = {
           registration_status: string | null
           relationship_owner: string | null
           state: string
+          stock_symbol: string | null
           street_address: string
           street_address_line2: string | null
           tax_id: string | null
@@ -1191,10 +1194,12 @@ export type Database = {
           country: string
           created_at?: string | null
           currency?: string | null
+          duns_number?: string | null
           email: string
           employee_count?: string | null
           id?: string
           legal_entity_name: string
+          operating_status?: string | null
           payment_terms?: string | null
           phone_number?: string | null
           postal_code: string
@@ -1203,6 +1208,7 @@ export type Database = {
           registration_status?: string | null
           relationship_owner?: string | null
           state: string
+          stock_symbol?: string | null
           street_address: string
           street_address_line2?: string | null
           tax_id?: string | null
@@ -1229,10 +1235,12 @@ export type Database = {
           country?: string
           created_at?: string | null
           currency?: string | null
+          duns_number?: string | null
           email?: string
           employee_count?: string | null
           id?: string
           legal_entity_name?: string
+          operating_status?: string | null
           payment_terms?: string | null
           phone_number?: string | null
           postal_code?: string
@@ -1241,6 +1249,7 @@ export type Database = {
           registration_status?: string | null
           relationship_owner?: string | null
           state?: string
+          stock_symbol?: string | null
           street_address?: string
           street_address_line2?: string | null
           tax_id?: string | null
@@ -1256,6 +1265,47 @@ export type Database = {
           year_established?: string | null
         }
         Relationships: []
+      }
+      verification_documents: {
+        Row: {
+          articles_of_incorporation: string | null
+          business_licenses: string | null
+          created_at: string | null
+          ein_verification_letter: string | null
+          id: string
+          updated_at: string | null
+          vendor_id: string | null
+          w9_form: string | null
+        }
+        Insert: {
+          articles_of_incorporation?: string | null
+          business_licenses?: string | null
+          created_at?: string | null
+          ein_verification_letter?: string | null
+          id?: string
+          updated_at?: string | null
+          vendor_id?: string | null
+          w9_form?: string | null
+        }
+        Update: {
+          articles_of_incorporation?: string | null
+          business_licenses?: string | null
+          created_at?: string | null
+          ein_verification_letter?: string | null
+          id?: string
+          updated_at?: string | null
+          vendor_id?: string | null
+          w9_form?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_documents_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["vendor_id"]
+          },
+        ]
       }
     }
     Views: {

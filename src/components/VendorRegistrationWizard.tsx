@@ -41,12 +41,15 @@ interface VendorRegistrationWizardProps {
 const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onComplete, initialData = {} }) => {
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
-    // Step 1: Basic Information
+    // Step 1: Company Information
     legalEntityName: initialData.legalEntityName || '',
     tradeName: initialData.tradeName || '',
-    vendorType: initialData.vendorType || '',
+    companyType: initialData.companyType || '',
     yearEstablished: initialData.yearEstablished || '',
-    businessDescription: initialData.businessDescription || '',
+    aboutTheCompany: initialData.aboutTheCompany || '',
+    operatingStatus: initialData.operatingStatus || '',
+    stockSymbol: initialData.stockSymbol || '',
+    dunsNumber: initialData.dunsNumber || '',
     
     // Step 2: Contact Information
     contactName: initialData.contactName || '',
@@ -59,7 +62,7 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
     streetAddressLine2: initialData.streetAddressLine2 || '',
     city: initialData.city || '',
     state: initialData.state || '',
-    postalCode: initialData.postalCode || '',
+    zipCode: initialData.zipCode || '',
     country: initialData.country || 'US',
     customCountry: initialData.customCountry || '',
     
@@ -83,7 +86,7 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
   const progress = (currentStep / totalSteps) * 100;
 
   const stepTitles = [
-    'Basic Information',
+    'Company Information',
     'Contact Details', 
     'Address Information',
     'Business Details',
@@ -102,7 +105,33 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
       setIsDraft(true);
       
       const draftData = {
-        ...formData,
+        legal_entity_name: formData.legalEntityName,
+        trade_name: formData.tradeName,
+        vendor_type: formData.companyType,
+        year_established: formData.yearEstablished,
+        business_description: formData.aboutTheCompany,
+        operating_status: formData.operatingStatus,
+        stock_symbol: formData.stockSymbol,
+        duns_number: formData.dunsNumber,
+        contact_name: formData.contactName,
+        email: formData.email,
+        phone_number: formData.phoneNumber,
+        website: formData.website,
+        street_address: formData.streetAddress,
+        street_address_line2: formData.streetAddressLine2,
+        city: formData.city,
+        state: formData.state,
+        postal_code: formData.zipCode,
+        country: formData.country,
+        custom_country: formData.customCountry,
+        employee_count: formData.employeeCount,
+        annual_revenue: formData.annualRevenue,
+        products_services_description: formData.productsServicesDescription,
+        tax_id: formData.taxId,
+        vat_id: formData.vatId,
+        bank_account_details: formData.bankAccountDetails,
+        payment_terms: formData.paymentTerms,
+        currency: formData.currency,
         registration_status: 'draft',
         updated_at: new Date().toISOString()
       };
@@ -139,11 +168,11 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
   const validateStep = (step: number) => {
     switch (step) {
       case 1:
-        return formData.legalEntityName && formData.vendorType;
+        return formData.legalEntityName && formData.companyType;
       case 2:
         return formData.contactName && formData.email;
       case 3:
-        return formData.streetAddress && formData.city && formData.state && formData.postalCode && formData.country;
+        return formData.streetAddress && formData.city && formData.state && formData.zipCode && formData.country;
       case 4:
         return true; // Optional fields
       case 5:
@@ -182,7 +211,7 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
       case 1:
         return (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Basic Information</h3>
+            <h3 className="text-lg font-semibold">Company Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="legalEntityName">Legal Entity Name *</Label>
@@ -195,7 +224,7 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
                 />
               </div>
               <div>
-                <Label htmlFor="tradeName">Trade Name</Label>
+                <Label htmlFor="tradeName">Trade Name (Doing Business As)</Label>
                 <Input
                   id="tradeName"
                   value={formData.tradeName}
@@ -206,10 +235,10 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="vendorType">Vendor Type *</Label>
-                <Select value={formData.vendorType} onValueChange={(value) => handleInputChange('vendorType', value)}>
+                <Label htmlFor="companyType">Company Type *</Label>
+                <Select value={formData.companyType} onValueChange={(value) => handleInputChange('companyType', value)}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Select vendor type" />
+                    <SelectValue placeholder="Select company type" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="individual">Individual</SelectItem>
@@ -218,6 +247,7 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
                     <SelectItem value="llc">LLC</SelectItem>
                     <SelectItem value="nonprofit">Non-profit</SelectItem>
                     <SelectItem value="government">Government</SelectItem>
+                    <SelectItem value="for-profit">For Profit</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -234,13 +264,47 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
                 />
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="operatingStatus">Operating Status</Label>
+                <Select value={formData.operatingStatus} onValueChange={(value) => handleInputChange('operatingStatus', value)}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select operating status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                    <SelectItem value="suspended">Suspended</SelectItem>
+                    <SelectItem value="dissolved">Dissolved</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="stockSymbol">Stock Symbol</Label>
+                <Input
+                  id="stockSymbol"
+                  value={formData.stockSymbol}
+                  onChange={(e) => handleInputChange('stockSymbol', e.target.value)}
+                  placeholder="e.g., AAPL"
+                />
+              </div>
+            </div>
             <div>
-              <Label htmlFor="businessDescription">Business Description</Label>
+              <Label htmlFor="dunsNumber">D-U-N-S Number (optional)</Label>
+              <Input
+                id="dunsNumber"
+                value={formData.dunsNumber}
+                onChange={(e) => handleInputChange('dunsNumber', e.target.value)}
+                placeholder="Enter D-U-N-S number"
+              />
+            </div>
+            <div>
+              <Label htmlFor="aboutTheCompany">About the Company</Label>
               <Textarea
-                id="businessDescription"
-                value={formData.businessDescription}
-                onChange={(e) => handleInputChange('businessDescription', e.target.value)}
-                placeholder="Describe your business and services"
+                id="aboutTheCompany"
+                value={formData.aboutTheCompany}
+                onChange={(e) => handleInputChange('aboutTheCompany', e.target.value)}
+                placeholder="Describe your company and services"
                 rows={3}
               />
             </div>
@@ -253,24 +317,22 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
             <h3 className="text-lg font-semibold">Contact Details</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="contactName">Primary Contact Name *</Label>
+                <Label htmlFor="contactName">Primary Contact Name</Label>
                 <Input
                   id="contactName"
                   value={formData.contactName}
                   onChange={(e) => handleInputChange('contactName', e.target.value)}
                   placeholder="Enter contact person's name"
-                  required
                 />
               </div>
               <div>
-                <Label htmlFor="email">Email Address *</Label>
+                <Label htmlFor="email">Email Address</Label>
                 <Input
                   id="email"
                   type="email"
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   placeholder="Enter email address"
-                  required
                 />
               </div>
             </div>
@@ -340,12 +402,12 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
                 />
               </div>
               <div>
-                <Label htmlFor="postalCode">Postal Code *</Label>
+                <Label htmlFor="zipCode">ZIP Code *</Label>
                 <Input
-                  id="postalCode"
-                  value={formData.postalCode}
-                  onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                  placeholder="Enter postal code"
+                  id="zipCode"
+                  value={formData.zipCode}
+                  onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                  placeholder="Enter ZIP code"
                   required
                 />
               </div>
@@ -396,7 +458,10 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
                     <SelectItem value="11-50">11-50</SelectItem>
                     <SelectItem value="51-200">51-200</SelectItem>
                     <SelectItem value="201-500">201-500</SelectItem>
-                    <SelectItem value="500+">500+</SelectItem>
+                    <SelectItem value="501-1000">501-1,000</SelectItem>
+                    <SelectItem value="1001-5000">1,001-5,000</SelectItem>
+                    <SelectItem value="5001-10000">5,001-10,000</SelectItem>
+                    <SelectItem value="10000+">10,000+</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
