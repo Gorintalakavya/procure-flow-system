@@ -8,15 +8,25 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, ArrowLeft } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useNavigate } from "react-router-dom";
 
 interface VendorUser {
   vendorId: string;
   email: string;
+}
+
+interface OverviewInfo {
+  company_description: string;
+  ranking: string;
+  key_principal: string;
+  industry: string;
+  year_started: string;
+  date_of_incorporation: Date | null;
 }
 
 interface FinancialInfo {
@@ -27,6 +37,14 @@ interface FinancialInfo {
   swift_code: string;
   bank_address: string;
   reconciliation_account: string;
+  revenue: string;
+  sales_growth: string;
+  net_income_growth: string;
+  assets: string;
+  fiscal_year_end: string;
+  stock_exchange: string;
+  esg_ranking: string;
+  esg_industry_average: string;
 }
 
 interface ProcurementInfo {
@@ -47,11 +65,21 @@ interface ComplianceInfo {
 }
 
 const VendorProfile = () => {
+  const navigate = useNavigate();
   const [vendor, setVendor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState('financial');
+  const [activeSection, setActiveSection] = useState('overview');
   
   // Form states
+  const [overviewInfo, setOverviewInfo] = useState<OverviewInfo>({
+    company_description: '',
+    ranking: '',
+    key_principal: '',
+    industry: '',
+    year_started: '',
+    date_of_incorporation: null
+  });
+  
   const [financialInfo, setFinancialInfo] = useState<FinancialInfo>({
     bank_name: '',
     account_number: '',
@@ -59,7 +87,15 @@ const VendorProfile = () => {
     account_type: '',
     swift_code: '',
     bank_address: '',
-    reconciliation_account: ''
+    reconciliation_account: '',
+    revenue: '',
+    sales_growth: '',
+    net_income_growth: '',
+    assets: '',
+    fiscal_year_end: '',
+    stock_exchange: '',
+    esg_ranking: '',
+    esg_industry_average: ''
   });
   
   const [procurementInfo, setProcurementInfo] = useState<ProcurementInfo>({
@@ -124,6 +160,16 @@ const VendorProfile = () => {
         .maybeSingle();
 
       if (profile) {
+        // Load overview info
+        setOverviewInfo({
+          company_description: profile.company_description || vendorData.business_description || '',
+          ranking: profile.ranking || '',
+          key_principal: profile.key_principal || '',
+          industry: profile.industry || '',
+          year_started: profile.year_started || vendorData.year_established || '',
+          date_of_incorporation: profile.date_of_incorporation ? new Date(profile.date_of_incorporation) : null
+        });
+        
         // Load financial info
         setFinancialInfo({
           bank_name: profile.bank_name || '',
@@ -132,7 +178,15 @@ const VendorProfile = () => {
           account_type: profile.account_type || '',
           swift_code: profile.swift_code || '',
           bank_address: profile.bank_address || '',
-          reconciliation_account: profile.reconciliation_account || ''
+          reconciliation_account: profile.reconciliation_account || '',
+          revenue: profile.revenue || '',
+          sales_growth: profile.sales_growth || '',
+          net_income_growth: profile.net_income_growth || '',
+          assets: profile.assets || '',
+          fiscal_year_end: profile.fiscal_year_end || '',
+          stock_exchange: profile.stock_exchange || '',
+          esg_ranking: profile.esg_ranking || '',
+          esg_industry_average: profile.esg_industry_average || ''
         });
         
         // Load procurement info
@@ -162,6 +216,35 @@ const VendorProfile = () => {
     }
   };
 
+  const saveOverviewInfo = async () => {
+    if (!vendor) return;
+    
+    try {
+      const { error: profileError } = await supabase
+        .from('vendor_profiles')
+        .upsert({
+          user_id: vendor.id,
+          company_description: overviewInfo.company_description,
+          ranking: overviewInfo.ranking,
+          key_principal: overviewInfo.key_principal,
+          industry: overviewInfo.industry,
+          year_started: overviewInfo.year_started,
+          date_of_incorporation: overviewInfo.date_of_incorporation?.toISOString().split('T')[0] || null
+        });
+
+      if (profileError) {
+        console.error('Error saving overview info:', profileError);
+        toast.error('Error saving overview information');
+        return;
+      }
+
+      toast.success('Overview information saved successfully');
+    } catch (error) {
+      console.error('Error saving overview info:', error);
+      toast.error('Error saving overview information');
+    }
+  };
+
   const saveFinancialInfo = async () => {
     if (!vendor) return;
     
@@ -176,7 +259,15 @@ const VendorProfile = () => {
           account_type: financialInfo.account_type,
           swift_code: financialInfo.swift_code,
           bank_address: financialInfo.bank_address,
-          reconciliation_account: financialInfo.reconciliation_account
+          reconciliation_account: financialInfo.reconciliation_account,
+          revenue: financialInfo.revenue,
+          sales_growth: financialInfo.sales_growth,
+          net_income_growth: financialInfo.net_income_growth,
+          assets: financialInfo.assets,
+          fiscal_year_end: financialInfo.fiscal_year_end,
+          stock_exchange: financialInfo.stock_exchange,
+          esg_ranking: financialInfo.esg_ranking,
+          esg_industry_average: financialInfo.esg_industry_average
         });
 
       if (profileError) {
@@ -258,6 +349,7 @@ const VendorProfile = () => {
   }
 
   const sectionTitles = {
+    overview: 'Overview',
     financial: 'Financial Information',
     procurement: 'Procurement Information',
     compliance: 'Compliance & Audit'
@@ -265,7 +357,15 @@ const VendorProfile = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-8">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center gap-4 mb-6">
+        <Button 
+          variant="outline" 
+          onClick={() => navigate(-1)}
+          className="flex items-center gap-2"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Button>
         <div>
           <h1 className="text-3xl font-bold text-gray-900">{vendor.legal_entity_name}</h1>
           <p className="text-gray-600">Vendor ID: {vendor.vendor_id}</p>
@@ -292,12 +392,95 @@ const VendorProfile = () => {
         </nav>
       </div>
 
+      {/* Overview Section */}
+      {activeSection === 'overview' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Overview</CardTitle>
+            <CardDescription>Company overview and general information</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="company_description">Company Description</Label>
+              <Textarea
+                id="company_description"
+                value={overviewInfo.company_description}
+                onChange={(e) => setOverviewInfo(prev => ({ ...prev, company_description: e.target.value }))}
+                className="min-h-[100px]"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="ranking">Ranking</Label>
+                <Input
+                  id="ranking"
+                  value={overviewInfo.ranking}
+                  onChange={(e) => setOverviewInfo(prev => ({ ...prev, ranking: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="key_principal">Key Principal</Label>
+                <Input
+                  id="key_principal"
+                  value={overviewInfo.key_principal}
+                  onChange={(e) => setOverviewInfo(prev => ({ ...prev, key_principal: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="industry">Industry</Label>
+                <Input
+                  id="industry"
+                  value={overviewInfo.industry}
+                  onChange={(e) => setOverviewInfo(prev => ({ ...prev, industry: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="year_started">Year Started</Label>
+                <Input
+                  id="year_started"
+                  value={overviewInfo.year_started}
+                  onChange={(e) => setOverviewInfo(prev => ({ ...prev, year_started: e.target.value }))}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Date of Incorporation</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !overviewInfo.date_of_incorporation && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {overviewInfo.date_of_incorporation ? format(overviewInfo.date_of_incorporation, "PPP") : "Pick a date"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0">
+                  <Calendar
+                    mode="single"
+                    selected={overviewInfo.date_of_incorporation || undefined}
+                    onSelect={(date) => setOverviewInfo(prev => ({ ...prev, date_of_incorporation: date || null }))}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+            <Button onClick={saveOverviewInfo} className="w-full">
+              Save Overview Information
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Financial Information */}
       {activeSection === 'financial' && (
         <Card>
           <CardHeader>
             <CardTitle>Financial Information</CardTitle>
-            <CardDescription>Bank account and financial details</CardDescription>
+            <CardDescription>Banking details and financial metrics</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
@@ -355,6 +538,70 @@ const VendorProfile = () => {
                   id="reconciliation_account"
                   value={financialInfo.reconciliation_account}
                   onChange={(e) => setFinancialInfo(prev => ({ ...prev, reconciliation_account: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="revenue">Revenue</Label>
+                <Input
+                  id="revenue"
+                  value={financialInfo.revenue}
+                  onChange={(e) => setFinancialInfo(prev => ({ ...prev, revenue: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sales_growth">Sales Growth</Label>
+                <Input
+                  id="sales_growth"
+                  value={financialInfo.sales_growth}
+                  onChange={(e) => setFinancialInfo(prev => ({ ...prev, sales_growth: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="net_income_growth">Net Income Growth</Label>
+                <Input
+                  id="net_income_growth"
+                  value={financialInfo.net_income_growth}
+                  onChange={(e) => setFinancialInfo(prev => ({ ...prev, net_income_growth: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assets">Assets</Label>
+                <Input
+                  id="assets"
+                  value={financialInfo.assets}
+                  onChange={(e) => setFinancialInfo(prev => ({ ...prev, assets: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fiscal_year_end">Fiscal Year End</Label>
+                <Input
+                  id="fiscal_year_end"
+                  value={financialInfo.fiscal_year_end}
+                  onChange={(e) => setFinancialInfo(prev => ({ ...prev, fiscal_year_end: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="stock_exchange">Stock Exchange</Label>
+                <Input
+                  id="stock_exchange"
+                  value={financialInfo.stock_exchange}
+                  onChange={(e) => setFinancialInfo(prev => ({ ...prev, stock_exchange: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="esg_ranking">ESG Ranking</Label>
+                <Input
+                  id="esg_ranking"
+                  value={financialInfo.esg_ranking}
+                  onChange={(e) => setFinancialInfo(prev => ({ ...prev, esg_ranking: e.target.value }))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="esg_industry_average">ESG Industry Average</Label>
+                <Input
+                  id="esg_industry_average"
+                  value={financialInfo.esg_industry_average}
+                  onChange={(e) => setFinancialInfo(prev => ({ ...prev, esg_industry_average: e.target.value }))}
                 />
               </div>
             </div>
