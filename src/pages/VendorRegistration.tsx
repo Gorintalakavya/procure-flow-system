@@ -12,255 +12,24 @@ import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 const COUNTRIES = [
-  { code: 'AD', name: 'Andorra' },
-  { code: 'AE', name: 'United Arab Emirates' },
-  { code: 'AF', name: 'Afghanistan' },
-  { code: 'AG', name: 'Antigua and Barbuda' },
-  { code: 'AI', name: 'Anguilla' },
-  { code: 'AL', name: 'Albania' },
-  { code: 'AM', name: 'Armenia' },
-  { code: 'AO', name: 'Angola' },
-  { code: 'AQ', name: 'Antarctica' },
-  { code: 'AR', name: 'Argentina' },
-  { code: 'AS', name: 'American Samoa' },
-  { code: 'AT', name: 'Austria' },
-  { code: 'AU', name: 'Australia' },
-  { code: 'AW', name: 'Aruba' },
-  { code: 'AX', name: 'Åland Islands' },
-  { code: 'AZ', name: 'Azerbaijan' },
-  { code: 'BA', name: 'Bosnia and Herzegovina' },
-  { code: 'BB', name: 'Barbados' },
-  { code: 'BD', name: 'Bangladesh' },
-  { code: 'BE', name: 'Belgium' },
-  { code: 'BF', name: 'Burkina Faso' },
-  { code: 'BG', name: 'Bulgaria' },
-  { code: 'BH', name: 'Bahrain' },
-  { code: 'BI', name: 'Burundi' },
-  { code: 'BJ', name: 'Benin' },
-  { code: 'BL', name: 'Saint Barthélemy' },
-  { code: 'BM', name: 'Bermuda' },
-  { code: 'BN', name: 'Brunei Darussalam' },
-  { code: 'BO', name: 'Bolivia' },
-  { code: 'BQ', name: 'Bonaire, Sint Eustatius and Saba' },
-  { code: 'BR', name: 'Brazil' },
-  { code: 'BS', name: 'Bahamas' },
-  { code: 'BT', name: 'Bhutan' },
-  { code: 'BV', name: 'Bouvet Island' },
-  { code: 'BW', name: 'Botswana' },
-  { code: 'BY', name: 'Belarus' },
-  { code: 'BZ', name: 'Belize' },
-  { code: 'CA', name: 'Canada' },
-  { code: 'CC', name: 'Cocos (Keeling) Islands' },
-  { code: 'CD', name: 'Congo, Democratic Republic of the' },
-  { code: 'CF', name: 'Central African Republic' },
-  { code: 'CG', name: 'Congo' },
-  { code: 'CH', name: 'Switzerland' },
-  { code: 'CI', name: "Côte d'Ivoire" },
-  { code: 'CK', name: 'Cook Islands' },
-  { code: 'CL', name: 'Chile' },
-  { code: 'CM', name: 'Cameroon' },
-  { code: 'CN', name: 'China' },
-  { code: 'CO', name: 'Colombia' },
-  { code: 'CR', name: 'Costa Rica' },
-  { code: 'CU', name: 'Cuba' },
-  { code: 'CV', name: 'Cape Verde' },
-  { code: 'CW', name: 'Curaçao' },
-  { code: 'CX', name: 'Christmas Island' },
-  { code: 'CY', name: 'Cyprus' },
-  { code: 'CZ', name: 'Czech Republic' },
-  { code: 'DE', name: 'Germany' },
-  { code: 'DJ', name: 'Djibouti' },
-  { code: 'DK', name: 'Denmark' },
-  { code: 'DM', name: 'Dominica' },
-  { code: 'DO', name: 'Dominican Republic' },
-  { code: 'DZ', name: 'Algeria' },
-  { code: 'EC', name: 'Ecuador' },
-  { code: 'EE', name: 'Estonia' },
-  { code: 'EG', name: 'Egypt' },
-  { code: 'EH', name: 'Western Sahara' },
-  { code: 'ER', name: 'Eritrea' },
-  { code: 'ES', name: 'Spain' },
-  { code: 'ET', name: 'Ethiopia' },
-  { code: 'FI', name: 'Finland' },
-  { code: 'FJ', name: 'Fiji' },
-  { code: 'FK', name: 'Falkland Islands (Malvinas)' },
-  { code: 'FM', name: 'Micronesia, Federated States of' },
-  { code: 'FO', name: 'Faroe Islands' },
-  { code: 'FR', name: 'France' },
-  { code: 'GA', name: 'Gabon' },
-  { code: 'GB', name: 'United Kingdom' },
-  { code: 'GD', name: 'Grenada' },
-  { code: 'GE', name: 'Georgia' },
-  { code: 'GF', name: 'French Guiana' },
-  { code: 'GG', name: 'Guernsey' },
-  { code: 'GH', name: 'Ghana' },
-  { code: 'GI', name: 'Gibraltar' },
-  { code: 'GL', name: 'Greenland' },
-  { code: 'GM', name: 'Gambia' },
-  { code: 'GN', name: 'Guinea' },
-  { code: 'GP', name: 'Guadeloupe' },
-  { code: 'GQ', name: 'Equatorial Guinea' },
-  { code: 'GR', name: 'Greece' },
-  { code: 'GS', name: 'South Georgia and the South Sandwich Islands' },
-  { code: 'GT', name: 'Guatemala' },
-  { code: 'GU', name: 'Guam' },
-  { code: 'GW', name: 'Guinea-Bissau' },
-  { code: 'GY', name: 'Guyana' },
-  { code: 'HK', name: 'Hong Kong' },
-  { code: 'HM', name: 'Heard Island and McDonald Islands' },
-  { code: 'HN', name: 'Honduras' },
-  { code: 'HR', name: 'Croatia' },
-  { code: 'HT', name: 'Haiti' },
-  { code: 'HU', name: 'Hungary' },
-  { code: 'ID', name: 'Indonesia' },
-  { code: 'IE', name: 'Ireland' },
-  { code: 'IL', name: 'Israel' },
-  { code: 'IM', name: 'Isle of Man' },
-  { code: 'IN', name: 'India' },
-  { code: 'IO', name: 'British Indian Ocean Territory' },
-  { code: 'IQ', name: 'Iraq' },
-  { code: 'IR', name: 'Iran, Islamic Republic of' },
-  { code: 'IS', name: 'Iceland' },
-  { code: 'IT', name: 'Italy' },
-  { code: 'JE', name: 'Jersey' },
-  { code: 'JM', name: 'Jamaica' },
-  { code: 'JO', name: 'Jordan' },
-  { code: 'JP', name: 'Japan' },
-  { code: 'KE', name: 'Kenya' },
-  { code: 'KG', name: 'Kyrgyzstan' },
-  { code: 'KH', name: 'Cambodia' },
-  { code: 'KI', name: 'Kiribati' },
-  { code: 'KM', name: 'Comoros' },
-  { code: 'KN', name: 'Saint Kitts and Nevis' },
-  { code: 'KP', name: "Korea, Democratic People's Republic of" },
-  { code: 'KR', name: 'Korea, Republic of' },
-  { code: 'KW', name: 'Kuwait' },
-  { code: 'KY', name: 'Cayman Islands' },
-  { code: 'KZ', name: 'Kazakhstan' },
-  { code: 'LA', name: "Lao People's Democratic Republic" },
-  { code: 'LB', name: 'Lebanon' },
-  { code: 'LC', name: 'Saint Lucia' },
-  { code: 'LI', name: 'Liechtenstein' },
-  { code: 'LK', name: 'Sri Lanka' },
-  { code: 'LR', name: 'Liberia' },
-  { code: 'LS', name: 'Lesotho' },
-  { code: 'LT', name: 'Lithuania' },
-  { code: 'LU', name: 'Luxembourg' },
-  { code: 'LV', name: 'Latvia' },
-  { code: 'LY', name: 'Libya' },
-  { code: 'MA', name: 'Morocco' },
-  { code: 'MC', name: 'Monaco' },
-  { code: 'MD', name: 'Moldova, Republic of' },
-  { code: 'ME', name: 'Montenegro' },
-  { code: 'MF', name: 'Saint Martin (French part)' },
-  { code: 'MG', name: 'Madagascar' },
-  { code: 'MH', name: 'Marshall Islands' },
-  { code: 'MK', name: 'Macedonia, the former Yugoslav Republic of' },
-  { code: 'ML', name: 'Mali' },
-  { code: 'MM', name: 'Myanmar' },
-  { code: 'MN', name: 'Mongolia' },
-  { code: 'MO', name: 'Macao' },
-  { code: 'MP', name: 'Northern Mariana Islands' },
-  { code: 'MQ', name: 'Martinique' },
-  { code: 'MR', name: 'Mauritania' },
-  { code: 'MS', name: 'Montserrat' },
-  { code: 'MT', name: 'Malta' },
-  { code: 'MU', name: 'Mauritius' },
-  { code: 'MV', name: 'Maldives' },
-  { code: 'MW', name: 'Malawi' },
-  { code: 'MX', name: 'Mexico' },
-  { code: 'MY', name: 'Malaysia' },
-  { code: 'MZ', name: 'Mozambique' },
-  { code: 'NA', name: 'Namibia' },
-  { code: 'NC', name: 'New Caledonia' },
-  { code: 'NE', name: 'Niger' },
-  { code: 'NF', name: 'Norfolk Island' },
-  { code: 'NG', name: 'Nigeria' },
-  { code: 'NI', name: 'Nicaragua' },
-  { code: 'NL', name: 'Netherlands' },
-  { code: 'NO', name: 'Norway' },
-  { code: 'NP', name: 'Nepal' },
-  { code: 'NR', name: 'Nauru' },
-  { code: 'NU', name: 'Niue' },
-  { code: 'NZ', name: 'New Zealand' },
-  { code: 'OM', name: 'Oman' },
-  { code: 'PA', name: 'Panama' },
-  { code: 'PE', name: 'Peru' },
-  { code: 'PF', name: 'French Polynesia' },
-  { code: 'PG', name: 'Papua New Guinea' },
-  { code: 'PH', name: 'Philippines' },
-  { code: 'PK', name: 'Pakistan' },
-  { code: 'PL', name: 'Poland' },
-  { code: 'PM', name: 'Saint Pierre and Miquelon' },
-  { code: 'PN', name: 'Pitcairn' },
-  { code: 'PR', name: 'Puerto Rico' },
-  { code: 'PS', name: 'Palestine, State of' },
-  { code: 'PT', name: 'Portugal' },
-  { code: 'PW', name: 'Palau' },
-  { code: 'PY', name: 'Paraguay' },
-  { code: 'QA', name: 'Qatar' },
-  { code: 'RE', name: 'Réunion' },
-  { code: 'RO', name: 'Romania' },
-  { code: 'RS', name: 'Serbia' },
-  { code: 'RU', name: 'Russian Federation' },
-  { code: 'RW', name: 'Rwanda' },
-  { code: 'SA', name: 'Saudi Arabia' },
-  { code: 'SB', name: 'Solomon Islands' },
-  { code: 'SC', name: 'Seychelles' },
-  { code: 'SD', name: 'Sudan' },
-  { code: 'SE', name: 'Sweden' },
-  { code: 'SG', name: 'Singapore' },
-  { code: 'SH', name: 'Saint Helena, Ascension and Tristan da Cunha' },
-  { code: 'SI', name: 'Slovenia' },
-  { code: 'SJ', name: 'Svalbard and Jan Mayen' },
-  { code: 'SK', name: 'Slovakia' },
-  { code: 'SL', name: 'Sierra Leone' },
-  { code: 'SM', name: 'San Marino' },
-  { code: 'SN', name: 'Senegal' },
-  { code: 'SO', name: 'Somalia' },
-  { code: 'SR', name: 'Suriname' },
-  { code: 'SS', name: 'South Sudan' },
-  { code: 'ST', name: 'Sao Tome and Principe' },
-  { code: 'SV', name: 'El Salvador' },
-  { code: 'SX', name: 'Sint Maarten (Dutch part)' },
-  { code: 'SY', name: 'Syrian Arab Republic' },
-  { code: 'SZ', name: 'Swaziland' },
-  { code: 'TC', name: 'Turks and Caicos Islands' },
-  { code: 'TD', name: 'Chad' },
-  { code: 'TF', name: 'French Southern Territories' },
-  { code: 'TG', name: 'Togo' },
-  { code: 'TH', name: 'Thailand' },
-  { code: 'TJ', name: 'Tajikistan' },
-  { code: 'TK', name: 'Tokelau' },
-  { code: 'TL', name: 'Timor-Leste' },
-  { code: 'TM', name: 'Turkmenistan' },
-  { code: 'TN', name: 'Tunisia' },
-  { code: 'TO', name: 'Tonga' },
-  { code: 'TR', name: 'Turkey' },
-  { code: 'TT', name: 'Trinidad and Tobago' },
-  { code: 'TV', name: 'Tuvalu' },
-  { code: 'TW', name: 'Taiwan, Province of China' },
-  { code: 'TZ', name: 'Tanzania, United Republic of' },
-  { code: 'UA', name: 'Ukraine' },
-  { code: 'UG', name: 'Uganda' },
-  { code: 'UM', name: 'United States Minor Outlying Islands' },
   { code: 'US', name: 'United States' },
-  { code: 'UY', name: 'Uruguay' },
-  { code: 'UZ', name: 'Uzbekistan' },
-  { code: 'VA', name: 'Holy See (Vatican City State)' },
-  { code: 'VC', name: 'Saint Vincent and the Grenadines' },
-  { code: 'VE', name: 'Venezuela, Bolivarian Republic of' },
-  { code: 'VG', name: 'Virgin Islands, British' },
-  { code: 'VI', name: 'Virgin Islands, U.S.' },
-  { code: 'VN', name: 'Viet Nam' },
-  { code: 'VU', name: 'Vanuatu' },
-  { code: 'WF', name: 'Wallis and Futuna' },
-  { code: 'WS', name: 'Samoa' },
-  { code: 'YE', name: 'Yemen' },
-  { code: 'YT', name: 'Mayotte' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'GB', name: 'United Kingdom' },
+  { code: 'AU', name: 'Australia' },
+  { code: 'DE', name: 'Germany' },
+  { code: 'FR', name: 'France' },
+  { code: 'IN', name: 'India' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'CN', name: 'China' },
+  { code: 'BR', name: 'Brazil' },
+  { code: 'MX', name: 'Mexico' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'NL', name: 'Netherlands' },
+  { code: 'SG', name: 'Singapore' },
+  { code: 'AE', name: 'United Arab Emirates' },
   { code: 'ZA', name: 'South Africa' },
-  { code: 'ZM', name: 'Zambia' },
-  { code: 'ZW', name: 'Zimbabwe' },
+  { code: 'KR', name: 'South Korea' },
   { code: 'Other', name: 'Other' }
 ];
 
@@ -270,12 +39,15 @@ const VendorRegistration = () => {
   const [formData, setFormData] = useState({
     legalEntityName: '',
     tradeName: '',
-    vendorType: '',
+    companyType: '',
+    operatingStatus: '',
+    stockSymbol: '',
+    dunsNumber: '',
     contactName: '',
     email: '',
     phoneNumber: '',
     website: '',
-    businessDescription: '',
+    aboutTheCompany: '',
     yearEstablished: '',
     employeeCount: '',
     annualRevenue: '',
@@ -283,14 +55,13 @@ const VendorRegistration = () => {
     streetAddressLine2: '',
     city: '',
     state: '',
-    postalCode: '',
+    zipCode: '',
     country: 'US',
     customCountry: '',
     productsServicesDescription: ''
   });
 
   const generateUniqueVendorId = () => {
-    // Generate 10-character Vendor ID: VEN + 4 letters + 3 numbers
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
     const numbers = '0123456789';
     let result = 'VEN';
@@ -346,8 +117,8 @@ const VendorRegistration = () => {
       console.log('📝 Vendor registration attempt...');
 
       const requiredFields = [
-        'legalEntityName', 'vendorType', 'contactName', 'email',
-        'streetAddress', 'city', 'state', 'postalCode', 'country'
+        'legalEntityName', 'companyType',
+        'streetAddress', 'city', 'state', 'zipCode', 'country'
       ];
 
       const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
@@ -357,7 +128,6 @@ const VendorRegistration = () => {
         return;
       }
 
-      // If country is "Other", check for custom country
       if (formData.country === 'Other' && !formData.customCountry) {
         toast.error('Please specify your country name');
         return;
@@ -383,12 +153,15 @@ const VendorRegistration = () => {
           vendor_id: vendorId,
           legal_entity_name: formData.legalEntityName,
           trade_name: formData.tradeName || null,
-          vendor_type: formData.vendorType,
+          vendor_type: formData.companyType,
+          operating_status: formData.operatingStatus || null,
+          stock_symbol: formData.stockSymbol || null,
+          duns_number: formData.dunsNumber || null,
           contact_name: formData.contactName,
           email: formData.email,
           phone_number: formData.phoneNumber || null,
           website: formData.website || null,
-          business_description: formData.businessDescription || null,
+          business_description: formData.aboutTheCompany || null,
           year_established: formData.yearEstablished || null,
           employee_count: formData.employeeCount || null,
           annual_revenue: formData.annualRevenue || null,
@@ -396,10 +169,10 @@ const VendorRegistration = () => {
           street_address_line2: formData.streetAddressLine2 || null,
           city: formData.city,
           state: formData.state,
-          postal_code: formData.postalCode,
+          postal_code: formData.zipCode,
           country: formData.country === 'Other' ? formData.customCountry : formData.country,
           products_services_description: formData.productsServicesDescription || null,
-          registration_status: 'incomplete',
+          registration_status: 'pending',
           currency: 'USD'
         })
         .select()
@@ -419,14 +192,13 @@ const VendorRegistration = () => {
           action: 'REGISTER',
           entity_type: 'vendor',
           entity_id: vendorId,
-          new_values: { registration_status: 'incomplete' },
+          new_values: { registration_status: 'pending' },
           ip_address: '127.0.0.1',
           user_agent: navigator.userAgent
         });
 
       await sendVendorConfirmationEmail(formData.email, 'registration', vendorId);
 
-      // Store pending vendor data in localStorage
       localStorage.setItem('pendingVendor', JSON.stringify({
         vendorId: vendorId,
         email: formData.email,
@@ -490,7 +262,7 @@ const VendorRegistration = () => {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="tradeName">Trade Name (if different)</Label>
+                      <Label htmlFor="tradeName">Trade Name (Doing Business As)</Label>
                       <Input
                         id="tradeName"
                         value={formData.tradeName}
@@ -502,10 +274,10 @@ const VendorRegistration = () => {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="vendorType">Vendor Type *</Label>
-                      <Select value={formData.vendorType} onValueChange={(value) => handleInputChange('vendorType', value)}>
+                      <Label htmlFor="companyType">Company Type *</Label>
+                      <Select value={formData.companyType} onValueChange={(value) => handleInputChange('companyType', value)}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select vendor type" />
+                          <SelectValue placeholder="Select company type" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="individual">Individual</SelectItem>
@@ -514,6 +286,7 @@ const VendorRegistration = () => {
                           <SelectItem value="llc">LLC</SelectItem>
                           <SelectItem value="nonprofit">Non-profit</SelectItem>
                           <SelectItem value="government">Government</SelectItem>
+                          <SelectItem value="for-profit">For Profit</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -531,13 +304,49 @@ const VendorRegistration = () => {
                     </div>
                   </div>
 
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="operatingStatus">Operating Status</Label>
+                      <Select value={formData.operatingStatus} onValueChange={(value) => handleInputChange('operatingStatus', value)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select operating status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Active</SelectItem>
+                          <SelectItem value="inactive">Inactive</SelectItem>
+                          <SelectItem value="suspended">Suspended</SelectItem>
+                          <SelectItem value="dissolved">Dissolved</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="stockSymbol">Stock Symbol</Label>
+                      <Input
+                        id="stockSymbol"
+                        value={formData.stockSymbol}
+                        onChange={(e) => handleInputChange('stockSymbol', e.target.value)}
+                        placeholder="e.g., AAPL"
+                      />
+                    </div>
+                  </div>
+
                   <div>
-                    <Label htmlFor="businessDescription">Business Description</Label>
+                    <Label htmlFor="dunsNumber">D-U-N-S Number (optional)</Label>
+                    <Input
+                      id="dunsNumber"
+                      value={formData.dunsNumber}
+                      onChange={(e) => handleInputChange('dunsNumber', e.target.value)}
+                      placeholder="Enter D-U-N-S number"
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="aboutTheCompany">About the Company</Label>
                     <Textarea
-                      id="businessDescription"
-                      value={formData.businessDescription}
-                      onChange={(e) => handleInputChange('businessDescription', e.target.value)}
-                      placeholder="Describe your business and services"
+                      id="aboutTheCompany"
+                      value={formData.aboutTheCompany}
+                      onChange={(e) => handleInputChange('aboutTheCompany', e.target.value)}
+                      placeholder="Describe your company and services"
                       rows={3}
                     />
                   </div>
@@ -549,17 +358,16 @@ const VendorRegistration = () => {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="contactName">Primary Contact Name *</Label>
+                      <Label htmlFor="contactName">Primary Contact Name</Label>
                       <Input
                         id="contactName"
                         value={formData.contactName}
                         onChange={(e) => handleInputChange('contactName', e.target.value)}
                         placeholder="Enter contact person's name"
-                        required
                       />
                     </div>
                     <div>
-                      <Label htmlFor="email">Email Address *</Label>
+                      <Label htmlFor="email">Email Address</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
@@ -569,7 +377,6 @@ const VendorRegistration = () => {
                           onChange={(e) => handleInputChange('email', e.target.value)}
                           placeholder="Enter email address"
                           className="pl-10"
-                          required
                         />
                       </div>
                     </div>
@@ -652,12 +459,12 @@ const VendorRegistration = () => {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="postalCode">Postal Code *</Label>
+                      <Label htmlFor="zipCode">ZIP Code *</Label>
                       <Input
-                        id="postalCode"
-                        value={formData.postalCode}
-                        onChange={(e) => handleInputChange('postalCode', e.target.value)}
-                        placeholder="Enter postal code"
+                        id="zipCode"
+                        value={formData.zipCode}
+                        onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                        placeholder="Enter ZIP code"
                         required
                       />
                     </div>
@@ -708,7 +515,11 @@ const VendorRegistration = () => {
                           <SelectItem value="11-50">11-50</SelectItem>
                           <SelectItem value="51-200">51-200</SelectItem>
                           <SelectItem value="201-500">201-500</SelectItem>
-                          <SelectItem value="500+">500+</SelectItem>
+                          <SelectItem value="501-1000">501-1,000</SelectItem>
+                          <SelectItem value="1001-5000">1,001-5,000</SelectItem>
+                          <SelectItem value="5001-10000">5,001-10,000</SelectItem>
+                          <SelectItem value="10001-50000">10,001-50,000</SelectItem>
+                          <SelectItem value="50000+">50,000+</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>

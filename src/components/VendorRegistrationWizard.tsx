@@ -137,7 +137,6 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
       };
 
       if (draftId) {
-        // Update existing draft
         const { error } = await supabase
           .from('vendor_drafts')
           .update(draftData)
@@ -145,7 +144,6 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
         
         if (error) throw error;
       } else {
-        // Create new draft
         const { data, error } = await supabase
           .from('vendor_drafts')
           .insert(draftData)
@@ -170,7 +168,7 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
       case 1:
         return formData.legalEntityName && formData.companyType;
       case 2:
-        return formData.contactName && formData.email;
+        return true; // Made optional
       case 3:
         return formData.streetAddress && formData.city && formData.state && formData.zipCode && formData.country;
       case 4:
@@ -461,7 +459,8 @@ const VendorRegistrationWizard: React.FC<VendorRegistrationWizardProps> = ({ onC
                     <SelectItem value="501-1000">501-1,000</SelectItem>
                     <SelectItem value="1001-5000">1,001-5,000</SelectItem>
                     <SelectItem value="5001-10000">5,001-10,000</SelectItem>
-                    <SelectItem value="10000+">10,000+</SelectItem>
+                    <SelectItem value="10001-50000">10,001-50,000</SelectItem>
+                    <SelectItem value="50000+">50,000+</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
