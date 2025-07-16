@@ -947,86 +947,128 @@ export type Database = {
         Row: {
           account_number: string | null
           account_type: string | null
+          assets: string | null
           bank_address: string | null
           bank_name: string | null
           billing_address: string | null
           certifications: string | null
+          company_description: string | null
           compliance_forms: string | null
           contract_details: string | null
           created_at: string | null
           currency: string | null
+          date_of_incorporation: string | null
+          esg_industry_average: string | null
+          esg_ranking: string | null
+          fiscal_year_end: string | null
           id: string
+          industry: string | null
+          key_principal: string | null
           last_audit_date: string | null
+          net_income_growth: string | null
           next_audit_date: string | null
           payment_terms: string | null
           primary_contact: string | null
+          ranking: string | null
           reconciliation_account: string | null
           regulatory_notes: string | null
           relationship_owner: string | null
+          revenue: string | null
           routing_number: string | null
+          sales_growth: string | null
           secondary_contact: string | null
           services_offered: string | null
+          stock_exchange: string | null
           swift_code: string | null
           tax_id: string | null
           updated_at: string | null
           user_id: string | null
           vendor_id: string | null
+          year_started: string | null
         }
         Insert: {
           account_number?: string | null
           account_type?: string | null
+          assets?: string | null
           bank_address?: string | null
           bank_name?: string | null
           billing_address?: string | null
           certifications?: string | null
+          company_description?: string | null
           compliance_forms?: string | null
           contract_details?: string | null
           created_at?: string | null
           currency?: string | null
+          date_of_incorporation?: string | null
+          esg_industry_average?: string | null
+          esg_ranking?: string | null
+          fiscal_year_end?: string | null
           id?: string
+          industry?: string | null
+          key_principal?: string | null
           last_audit_date?: string | null
+          net_income_growth?: string | null
           next_audit_date?: string | null
           payment_terms?: string | null
           primary_contact?: string | null
+          ranking?: string | null
           reconciliation_account?: string | null
           regulatory_notes?: string | null
           relationship_owner?: string | null
+          revenue?: string | null
           routing_number?: string | null
+          sales_growth?: string | null
           secondary_contact?: string | null
           services_offered?: string | null
+          stock_exchange?: string | null
           swift_code?: string | null
           tax_id?: string | null
           updated_at?: string | null
           user_id?: string | null
           vendor_id?: string | null
+          year_started?: string | null
         }
         Update: {
           account_number?: string | null
           account_type?: string | null
+          assets?: string | null
           bank_address?: string | null
           bank_name?: string | null
           billing_address?: string | null
           certifications?: string | null
+          company_description?: string | null
           compliance_forms?: string | null
           contract_details?: string | null
           created_at?: string | null
           currency?: string | null
+          date_of_incorporation?: string | null
+          esg_industry_average?: string | null
+          esg_ranking?: string | null
+          fiscal_year_end?: string | null
           id?: string
+          industry?: string | null
+          key_principal?: string | null
           last_audit_date?: string | null
+          net_income_growth?: string | null
           next_audit_date?: string | null
           payment_terms?: string | null
           primary_contact?: string | null
+          ranking?: string | null
           reconciliation_account?: string | null
           regulatory_notes?: string | null
           relationship_owner?: string | null
+          revenue?: string | null
           routing_number?: string | null
+          sales_growth?: string | null
           secondary_contact?: string | null
           services_offered?: string | null
+          stock_exchange?: string | null
           swift_code?: string | null
           tax_id?: string | null
           updated_at?: string | null
           user_id?: string | null
           vendor_id?: string | null
+          year_started?: string | null
         }
         Relationships: [
           {
