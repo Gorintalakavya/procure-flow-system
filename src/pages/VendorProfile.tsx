@@ -6,10 +6,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { CalendarIcon, Plus, Trash2 } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
@@ -18,15 +17,6 @@ import { toast } from "sonner";
 interface VendorUser {
   vendorId: string;
   email: string;
-}
-
-interface Director {
-  id: string;
-  name: string;
-  designation: string;
-  din: string;
-  appointment_date: Date | null;
-  cessation_date: Date | null;
 }
 
 interface FinancialInfo {
@@ -54,11 +44,6 @@ interface ComplianceInfo {
   regulatory_notes: string;
   last_audit_date: Date | null;
   next_audit_date: Date | null;
-}
-
-interface DirectorsInfo {
-  current_directors: Director[];
-  past_directors: Director[];
 }
 
 const VendorProfile = () => {
@@ -92,11 +77,6 @@ const VendorProfile = () => {
     regulatory_notes: '',
     last_audit_date: null,
     next_audit_date: null
-  });
-  
-  const [directorsInfo, setDirectorsInfo] = useState<DirectorsInfo>({
-    current_directors: [],
-    past_directors: []
   });
 
   useEffect(() => {
@@ -172,12 +152,6 @@ const VendorProfile = () => {
           regulatory_notes: profile.regulatory_notes || '',
           last_audit_date: profile.last_audit_date ? new Date(profile.last_audit_date) : null,
           next_audit_date: profile.next_audit_date ? new Date(profile.next_audit_date) : null
-        });
-        
-        // Load directors info
-        setDirectorsInfo({
-          current_directors: Array.isArray(profile.current_directors) ? profile.current_directors : [],
-          past_directors: Array.isArray(profile.past_directors) ? profile.past_directors : []
         });
       }
     } catch (error) {
@@ -275,86 +249,6 @@ const VendorProfile = () => {
     }
   };
 
-  const saveDirectorsInfo = async () => {
-    if (!vendor) return;
-    
-    try {
-      const { error } = await supabase
-        .from('vendor_profiles')
-        .upsert({
-          user_id: vendor.id,
-          current_directors: directorsInfo.current_directors,
-          past_directors: directorsInfo.past_directors
-        });
-
-      if (error) {
-        console.error('Error saving directors info:', error);
-        toast.error('Error saving directors information');
-        return;
-      }
-
-      toast.success('Directors information saved successfully');
-    } catch (error) {
-      console.error('Error saving directors info:', error);
-      toast.error('Error saving directors information');
-    }
-  };
-
-  const addDirector = (type: 'current' | 'past') => {
-    const newDirector: Director = {
-      id: Date.now().toString(),
-      name: '',
-      designation: '',
-      din: '',
-      appointment_date: null,
-      cessation_date: null
-    };
-
-    if (type === 'current') {
-      setDirectorsInfo(prev => ({
-        ...prev,
-        current_directors: [...prev.current_directors, newDirector]
-      }));
-    } else {
-      setDirectorsInfo(prev => ({
-        ...prev,
-        past_directors: [...prev.past_directors, newDirector]
-      }));
-    }
-  };
-
-  const removeDirector = (type: 'current' | 'past', id: string) => {
-    if (type === 'current') {
-      setDirectorsInfo(prev => ({
-        ...prev,
-        current_directors: prev.current_directors.filter(d => d.id !== id)
-      }));
-    } else {
-      setDirectorsInfo(prev => ({
-        ...prev,
-        past_directors: prev.past_directors.filter(d => d.id !== id)
-      }));
-    }
-  };
-
-  const updateDirector = (type: 'current' | 'past', id: string, field: keyof Director, value: any) => {
-    if (type === 'current') {
-      setDirectorsInfo(prev => ({
-        ...prev,
-        current_directors: prev.current_directors.map(d => 
-          d.id === id ? { ...d, [field]: value } : d
-        )
-      }));
-    } else {
-      setDirectorsInfo(prev => ({
-        ...prev,
-        past_directors: prev.past_directors.map(d => 
-          d.id === id ? { ...d, [field]: value } : d
-        )
-      }));
-    }
-  };
-
   if (loading) {
     return <div className="flex justify-center items-center h-64">Loading...</div>;
   }
@@ -366,8 +260,7 @@ const VendorProfile = () => {
   const sectionTitles = {
     financial: 'Financial Information',
     procurement: 'Procurement Information',
-    compliance: 'Compliance & Audit',
-    directors: 'Directory & Key Managerial Personnel'
+    compliance: 'Compliance & Audit'
   };
 
   return (
@@ -641,206 +534,6 @@ const VendorProfile = () => {
             </Button>
           </CardContent>
         </Card>
-      )}
-
-      {/* Directors Information */}
-      {activeSection === 'directors' && (
-        <div className="space-y-6">
-          {/* Current Directors */}
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Current Directors & Key Managerial Personnel</CardTitle>
-                  <CardDescription>Current active directors and key personnel</CardDescription>
-                </div>
-                <Button onClick={() => addDirector('current')} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Director
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {directorsInfo.current_directors.map((director, index) => (
-                <div key={director.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium">Director {index + 1}</h4>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeDirector('current', director.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Name</Label>
-                      <Input
-                        value={director.name}
-                        onChange={(e) => updateDirector('current', director.id, 'name', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Designation</Label>
-                      <Input
-                        value={director.designation}
-                        onChange={(e) => updateDirector('current', director.id, 'designation', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>DIN</Label>
-                      <Input
-                        value={director.din}
-                        onChange={(e) => updateDirector('current', director.id, 'din', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Appointment Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !director.appointment_date && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {director.appointment_date ? format(director.appointment_date, "PPP") : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={director.appointment_date || undefined}
-                            onSelect={(date) => updateDirector('current', director.id, 'appointment_date', date || null)}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {directorsInfo.current_directors.length === 0 && (
-                <p className="text-gray-500 text-center py-4">No current directors added</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Past Directors */}
-          <Card>
-            <CardHeader>
-              <div className="flex justify-between items-center">
-                <div>
-                  <CardTitle>Past Directors & Key Managerial Personnel</CardTitle>
-                  <CardDescription>Former directors and key personnel</CardDescription>
-                </div>
-                <Button onClick={() => addDirector('past')} size="sm">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Past Director
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {directorsInfo.past_directors.map((director, index) => (
-                <div key={director.id} className="border rounded-lg p-4 space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="font-medium">Past Director {index + 1}</h4>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => removeDirector('past', director.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Name</Label>
-                      <Input
-                        value={director.name}
-                        onChange={(e) => updateDirector('past', director.id, 'name', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Designation</Label>
-                      <Input
-                        value={director.designation}
-                        onChange={(e) => updateDirector('past', director.id, 'designation', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>DIN</Label>
-                      <Input
-                        value={director.din}
-                        onChange={(e) => updateDirector('past', director.id, 'din', e.target.value)}
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Appointment Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !director.appointment_date && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {director.appointment_date ? format(director.appointment_date, "PPP") : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={director.appointment_date || undefined}
-                            onSelect={(date) => updateDirector('past', director.id, 'appointment_date', date || null)}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Cessation Date</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left font-normal",
-                              !director.cessation_date && "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {director.cessation_date ? format(director.cessation_date, "PPP") : "Pick a date"}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0">
-                          <Calendar
-                            mode="single"
-                            selected={director.cessation_date || undefined}
-                            onSelect={(date) => updateDirector('past', director.id, 'cessation_date', date || null)}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {directorsInfo.past_directors.length === 0 && (
-                <p className="text-gray-500 text-center py-4">No past directors added</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Button onClick={saveDirectorsInfo} className="w-full">
-            Save Directors Information
-          </Button>
-        </div>
       )}
     </div>
   );
