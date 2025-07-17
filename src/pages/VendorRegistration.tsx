@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -85,7 +84,8 @@ const VendorRegistration = () => {
           email,
           vendorId: vendorId || '',
           section: 'vendor',
-          action
+          action,
+          apiKey: 'default-key'
         }
       });
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Users, Building2, FileText, Bell, TrendingUp, ArrowLeft } from "lucide-react";
+import { Users, Building2, FileText, Bell, TrendingUp, ArrowLeft, Shield } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,6 +11,7 @@ import AdminVendorManagement from "@/components/AdminVendorManagement";
 import AdminAnalytics from "@/components/AdminAnalytics";
 import AdminNotifications from "@/components/AdminNotifications";
 import AdminSettings from "@/components/AdminSettings";
+import AdminManagement from "@/components/AdminManagement";
 
 interface DashboardStats {
   totalVendors: number;
@@ -166,8 +167,9 @@ const AdminDashboard = () => {
 
         {/* Main Content Tabs */}
         <Tabs defaultValue="vendors" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="vendors">Vendor Management</TabsTrigger>
+            <TabsTrigger value="admins">Admin Management</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
             <TabsTrigger value="settings">Settings</TabsTrigger>
@@ -175,6 +177,10 @@ const AdminDashboard = () => {
 
           <TabsContent value="vendors">
             <AdminVendorManagement />
+          </TabsContent>
+
+          <TabsContent value="admins">
+            <AdminManagement />
           </TabsContent>
 
           <TabsContent value="analytics">
