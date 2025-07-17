@@ -49,6 +49,7 @@ const AdminVendorManagement = () => {
   const [reviewNotes, setReviewNotes] = useState('');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [showReviewDialog, setShowReviewDialog] = useState(false);
 
   useEffect(() => {
     fetchVendors();
@@ -128,10 +129,11 @@ const AdminVendorManagement = () => {
         });
       }
 
-      toast.success(`Vendor status updated to ${newStatus}`);
+      toast.success(`Vendor status updated to ${newStatus}. Confirmation email sent.`);
       fetchVendors();
       setSelectedVendor(null);
       setReviewNotes('');
+      setShowReviewDialog(false);
     } catch (error) {
       console.error('Error updating vendor status:', error);
       toast.error('Failed to update vendor status');
@@ -179,6 +181,20 @@ const AdminVendorManagement = () => {
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
+  };
+
+  const handleViewVendor = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setShowDetailsModal(true);
+  };
+
+  const handleEditVendor = (vendor: Vendor) => {
+    setEditingVendor(vendor);
+  };
+
+  const handleReviewVendor = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setShowReviewDialog(true);
   };
 
   if (isLoading) {
@@ -264,80 +280,27 @@ const AdminVendorManagement = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => {
-                          setSelectedVendor(vendor);
-                          setShowDetailsModal(true);
-                        }}
+                        onClick={() => handleViewVendor(vendor)}
+                        title="View Details"
                       >
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setEditingVendor(vendor)}
+                        onClick={() => handleEditVendor(vendor)}
+                        title="Edit Vendor"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setSelectedVendor(vendor)}
-                          >
-                            Review
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-md">
-                          <DialogHeader>
-                            <DialogTitle>Review Vendor: {vendor.legal_entity_name}</DialogTitle>
-                          </DialogHeader>
-                          <div className="space-y-4">
-                            <div>
-                              <Label>Vendor ID</Label>
-                              <p className="font-mono text-sm">{vendor.vendor_id}</p>
-                            </div>
-                            <div>
-                              <Label>Current Status</Label>
-                              <div className="mt-1">{getStatusBadge(vendor.registration_status)}</div>
-                            </div>
-                            <div>
-                              <Label htmlFor="reviewNotes">Review Notes (optional)</Label>
-                              <Textarea
-                                id="reviewNotes"
-                                value={reviewNotes}
-                                onChange={(e) => setReviewNotes(e.target.value)}
-                                placeholder="Add notes about this decision..."
-                                rows={3}
-                              />
-                            </div>
-                            <div className="flex gap-2">
-                              <Button
-                                className="flex-1 bg-green-600 hover:bg-green-700"
-                                onClick={() => updateVendorStatus(vendor.vendor_id, 'approved', reviewNotes)}
-                              >
-                                <Check className="h-4 w-4 mr-2" />
-                                Approve
-                              </Button>
-                              <Button
-                                variant="destructive"
-                                className="flex-1"
-                                onClick={() => updateVendorStatus(vendor.vendor_id, 'rejected', reviewNotes)}
-                              >
-                                <X className="h-4 w-4 mr-2" />
-                                Reject
-                              </Button>
-                            </div>
-                            <Button
-                              variant="outline"
-                              className="w-full"
-                              onClick={() => updateVendorStatus(vendor.vendor_id, 'suspended', reviewNotes)}
-                            >
-                              Suspend
-                            </Button>
-                          </div>
-                        </DialogContent>
-                      </Dialog>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleReviewVendor(vendor)}
+                        title="Review Status"
+                      >
+                        Review
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -365,6 +328,59 @@ const AdminVendorManagement = () => {
           isAdmin={true}
         />
       )}
+
+      {/* Review Dialog */}
+      <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Review Vendor: {selectedVendor?.legal_entity_name}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Vendor ID</Label>
+              <p className="font-mono text-sm">{selectedVendor?.vendor_id}</p>
+            </div>
+            <div>
+              <Label>Current Status</Label>
+              <div className="mt-1">{selectedVendor && getStatusBadge(selectedVendor.registration_status)}</div>
+            </div>
+            <div>
+              <Label htmlFor="reviewNotes">Review Notes (optional)</Label>
+              <Textarea
+                id="reviewNotes"
+                value={reviewNotes}
+                onChange={(e) => setReviewNotes(e.target.value)}
+                placeholder="Add notes about this decision..."
+                rows={3}
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1 bg-green-600 hover:bg-green-700"
+                onClick={() => selectedVendor && updateVendorStatus(selectedVendor.vendor_id, 'approved', reviewNotes)}
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Approve
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={() => selectedVendor && updateVendorStatus(selectedVendor.vendor_id, 'rejected', reviewNotes)}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Reject
+              </Button>
+            </div>
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => selectedVendor && updateVendorStatus(selectedVendor.vendor_id, 'suspended', reviewNotes)}
+            >
+              Suspend
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

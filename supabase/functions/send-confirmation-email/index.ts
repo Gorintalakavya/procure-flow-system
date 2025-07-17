@@ -30,6 +30,8 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const { email, vendorId, adminId, section, action, password, isNewAccount, notes }: EmailRequest = await req.json();
 
+    console.log(`Processing email request for: ${email}, action: ${action}`);
+
     let emailSubject = "";
     let emailContent = "";
 
@@ -270,6 +272,42 @@ const handler = async (req: Request): Promise<Response> => {
               </div>
             `;
             break;
+          case 'forgot-password':
+            emailSubject = `Password Reset Request - ${vendorId}`;
+            emailContent = `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <div style="background-color: #f59e0b; color: white; padding: 20px; text-align: center;">
+                  <h1 style="margin: 0; font-size: 24px;">Password Reset Request</h1>
+                </div>
+                <div style="padding: 30px; background-color: #f9fafb;">
+                  <p style="font-size: 16px; margin-bottom: 20px;">We received a request to reset your password.</p>
+                  
+                  <div style="background-color: #e5e7eb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                    <h2 style="color: #1f2937; margin-top: 0;">Reset Details:</h2>
+                    <p><strong>Vendor ID:</strong> ${vendorId}</p>
+                    <p><strong>Request Time:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>Email:</strong> ${email}</p>
+                  </div>
+                  
+                  <p>Please contact our support team to reset your password. For security reasons, password resets must be handled by our support team.</p>
+                  
+                  <div style="background-color: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0;">
+                    <p style="margin: 0;">If you did not request this password reset, please contact support immediately.</p>
+                  </div>
+                  
+                  <div style="text-align: center; margin: 30px 0;">
+                    <a href="${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/contact" 
+                       style="background-color: #f59e0b; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                      Contact Support
+                    </a>
+                  </div>
+                </div>
+                <div style="background-color: #374151; color: white; padding: 20px; text-align: center;">
+                  <p style="margin: 0;">Best regards,<br>The Vendor Management Team</p>
+                </div>
+              </div>
+            `;
+            break;
           default:
             emailSubject = `Vendor Profile Update - ${vendorId}`;
             emailContent = `
@@ -323,6 +361,8 @@ const handler = async (req: Request): Promise<Response> => {
         `;
       }
     }
+
+    console.log(`Sending email with subject: ${emailSubject}`);
 
     const emailResponse = await resend.emails.send({
       from: "Vendor Portal <onboarding@resend.dev>",

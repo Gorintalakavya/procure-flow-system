@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,13 +36,15 @@ const VendorAuth = () => {
       setSignupData(prev => ({
         ...prev,
         vendorId: vendor.vendorId,
-        email: vendor.email || '' // Allow email to be editable even if empty
+        email: vendor.email || ''
       }));
     }
   }, []);
 
   const sendConfirmationEmail = async (email: string, vendorId: string, action: string) => {
     try {
+      console.log(`🚀 Sending confirmation email for ${action} to ${email}`);
+      
       const { error } = await supabase.functions.invoke('send-confirmation-email', {
         body: {
           email,
@@ -52,15 +55,17 @@ const VendorAuth = () => {
       });
 
       if (error) {
-        console.error('Error sending confirmation email:', error);
+        console.error('❌ Error sending confirmation email:', error);
         toast.error('Failed to send confirmation email');
+        return false;
       } else {
-        console.log('Confirmation email sent successfully');
-        toast.success('Confirmation email sent to your email address!');
+        console.log('✅ Confirmation email sent successfully');
+        return true;
       }
     } catch (error) {
-      console.error('Error invoking email function:', error);
+      console.error('❌ Error invoking email function:', error);
       toast.error('Failed to send confirmation email');
+      return false;
     }
   };
 
@@ -127,10 +132,15 @@ const VendorAuth = () => {
         timestamp: new Date().toISOString()
       });
 
-      await sendConfirmationEmail(userData.email, userData.vendor_id || '', 'signin');
+      const emailSent = await sendConfirmationEmail(userData.email, userData.vendor_id || '', 'signin');
       
       console.log('✅ Vendor login successful');
-      toast.success('Login successful! Redirecting to your profile...');
+      
+      if (emailSent) {
+        toast.success('Login successful! Confirmation email sent. Redirecting to your profile...');
+      } else {
+        toast.success('Login successful! Redirecting to your profile...');
+      }
       
       setTimeout(() => {
         navigate('/vendor-profile');
@@ -240,16 +250,21 @@ const VendorAuth = () => {
         timestamp: new Date().toISOString()
       });
 
-      await sendConfirmationEmail(newUser.email, newUser.vendor_id || '', 'signup');
+      const emailSent = await sendConfirmationEmail(newUser.email, newUser.vendor_id || '', 'signup');
       
       console.log('✅ Vendor account created successfully');
-      toast.success('Account created successfully! Confirmation email sent.');
+      
+      if (emailSent) {
+        toast.success('Account created successfully! Confirmation email sent to your email address.');
+      } else {
+        toast.success('Account created successfully!');
+      }
       
       localStorage.removeItem('pendingVendor');
       
       setTimeout(() => {
         navigate('/vendor-profile');
-      }, 1000);
+      }, 1500);
 
     } catch (error) {
       console.error('❌ Error creating user:', error);
@@ -279,8 +294,14 @@ const VendorAuth = () => {
         return;
       }
 
-      await sendConfirmationEmail(forgotPasswordEmail, existingUser.vendor_id || '', 'forgot-password');
-      toast.success('Password reset instructions sent to your email');
+      const emailSent = await sendConfirmationEmail(forgotPasswordEmail, existingUser.vendor_id || '', 'forgot-password');
+      
+      if (emailSent) {
+        toast.success('Password reset instructions sent to your email');
+      } else {
+        toast.error('Failed to send password reset email');
+      }
+      
       setForgotPasswordEmail('');
     } catch (error) {
       console.error('Forgot password error:', error);
