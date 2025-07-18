@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from "@/components/ui/input";
@@ -6,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import * as bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const AdminLogin = () => {
   const [formData, setFormData] = useState({
@@ -268,83 +270,105 @@ const AdminLogin = () => {
         <CardContent className="grid gap-4">
           {error && <div className="text-red-500 text-sm">{error}</div>}
 
-          {showSignUp && (
-            <div className="grid gap-2">
-              <Label htmlFor="name">Name</Label>
-              <Input
-                id="name"
-                placeholder="Enter your name"
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-          )}
-
-          <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              placeholder="Enter your email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              placeholder="Enter your password"
-              type="password"
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            />
-          </div>
-
-          {showForgotPassword && (
-            <div className="grid gap-2">
-              <Label htmlFor="forgot-password-email">Email</Label>
-              <Input
-                id="forgot-password-email"
-                placeholder="Enter your email"
-                type="email"
-                value={forgotPasswordEmail}
-                onChange={(e) => setForgotPasswordEmail(e.target.value)}
-              />
-            </div>
-          )}
-
           {showForgotPassword ? (
-            <Button disabled={isLoading} onClick={handleForgotPassword} className="w-full">
-              {isLoading ? "Sending Reset Email..." : "Send Reset Email"}
-            </Button>
-          ) : showSignUp ? (
-            <Button disabled={isLoading} onClick={handleSignUp} className="w-full">
-              {isLoading ? "Creating Account..." : "Create Account"}
-            </Button>
+            <>
+              <div className="grid gap-2">
+                <Label htmlFor="forgot-password-email">Email</Label>
+                <Input
+                  id="forgot-password-email"
+                  placeholder="Enter your email"
+                  type="email"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                />
+              </div>
+              <Button disabled={isLoading} onClick={handleForgotPassword} className="w-full">
+                {isLoading ? "Sending Reset Email..." : "Send Reset Email"}
+              </Button>
+              <Button variant="link" onClick={() => setShowForgotPassword(false)}>
+                Back to Login
+              </Button>
+            </>
           ) : (
-            <Button disabled={isLoading} onClick={handleSignIn} className="w-full">
-              {isLoading ? "Signing In..." : "Sign In"}
-            </Button>
-          )}
+            <>
+              {showSignUp && (
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="Enter your name"
+                    type="text"
+                    value={formData.name}
+                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  />
+                </div>
+              )}
 
-          {!showForgotPassword && (
-            <div className="flex justify-between text-sm">
-              {!showSignUp ? (
-                <Button variant="link" onClick={() => setShowSignUp(true)}>
-                  Create Account
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  placeholder="Enter your email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  placeholder="Enter your password"
+                  type="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                />
+              </div>
+
+              {showSignUp && (
+                <div className="grid gap-2">
+                  <Label htmlFor="role">Role</Label>
+                  <Select value={formData.role} onValueChange={(value) => setFormData({ ...formData, role: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select your role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="administrator">Administrator</SelectItem>
+                      <SelectItem value="procurement-officer">Procurement Officer</SelectItem>
+                      <SelectItem value="finance-team">Finance Team</SelectItem>
+                      <SelectItem value="compliance-manager">Compliance Manager</SelectItem>
+                      <SelectItem value="audit-manager">Audit Manager</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {showSignUp ? (
+                <Button disabled={isLoading} onClick={handleSignUp} className="w-full">
+                  {isLoading ? "Creating Account..." : "Create Account"}
                 </Button>
               ) : (
-                <Button variant="link" onClick={() => setShowSignUp(false)}>
-                  Already have an account?
+                <Button disabled={isLoading} onClick={handleSignIn} className="w-full">
+                  {isLoading ? "Signing In..." : "Sign In"}
                 </Button>
               )}
-              <Button variant="link" onClick={() => setShowForgotPassword(true)}>
-                Forgot Password?
-              </Button>
-            </div>
+
+              <div className="flex justify-between text-sm">
+                {!showSignUp ? (
+                  <Button variant="link" onClick={() => setShowSignUp(true)}>
+                    Create Account
+                  </Button>
+                ) : (
+                  <Button variant="link" onClick={() => setShowSignUp(false)}>
+                    Already have an account?
+                  </Button>
+                )}
+                <Button variant="link" onClick={() => setShowForgotPassword(true)}>
+                  Forgot Password?
+                </Button>
+              </div>
+            </>
           )}
         </CardContent>
       </Card>

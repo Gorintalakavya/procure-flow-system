@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from "@/components/ui/input"
@@ -6,7 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client";
-import * as bcrypt from 'bcryptjs';
+import bcrypt from 'bcryptjs';
 import { Separator } from "@/components/ui/separator"
 
 interface FormData {
