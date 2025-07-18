@@ -51,7 +51,8 @@ const AdminLogin = () => {
       return { success: true };
     } catch (error) {
       console.error('❌ Error sending admin confirmation email:', error);
-      throw error;
+      // Don't throw error here, just log it so signup/signin can continue
+      return { success: false, error };
     }
   };
 
@@ -67,24 +68,30 @@ const AdminLogin = () => {
     setError('');
 
     try {
-      console.log('🔐 Admin sign in attempt:', formData.email);
+      console.log('🔐 Admin sign in attempt for:', formData.email);
 
+      // First check if admin user exists
       const { data: adminUser, error: fetchError } = await supabase
         .from('admin_users')
         .select('*')
-        .eq('email', formData.email)
+        .eq('email', formData.email.toLowerCase().trim())
         .single();
 
       if (fetchError || !adminUser) {
-        throw new Error('Invalid credentials');
+        console.error('❌ Admin user not found:', fetchError);
+        throw new Error('Invalid email or password. Please check your credentials.');
       }
 
+      console.log('👤 Found admin user:', adminUser.email);
+
+      // Verify password
       const isValidPassword = await bcrypt.compare(formData.password, adminUser.password_hash);
       if (!isValidPassword) {
-        throw new Error('Invalid credentials');
+        console.error('❌ Invalid password for admin:', adminUser.email);
+        throw new Error('Invalid email or password. Please check your credentials.');
       }
 
-      console.log('✅ Admin login successful. Admin ID:', adminUser.id);
+      console.log('✅ Admin password validated successfully');
 
       // Get admin profile to get the actual admin_id
       const { data: adminProfile } = await supabase
@@ -93,20 +100,23 @@ const AdminLogin = () => {
         .eq('admin_user_id', adminUser.id)
         .single();
 
-      // Send confirmation email
+      console.log('✅ Admin login successful. Admin ID:', adminProfile?.admin_id || adminUser.id);
+
+      // Send confirmation email (don't block login if this fails)
       try {
         await sendAdminConfirmationEmail(
           adminUser.email, 
           adminProfile?.admin_id || adminUser.id,
           'admin-signin'
         );
+        console.log('✅ Confirmation email sent successfully');
       } catch (emailError) {
-        console.error('Email sending failed, but login continues:', emailError);
+        console.error('⚠️ Email sending failed, but login continues:', emailError);
       }
 
       toast({
         title: "Login Successful",
-        description: "Redirecting to admin dashboard...",
+        description: "Welcome back! Redirecting to admin dashboard...",
       });
 
       setTimeout(() => {
@@ -115,7 +125,7 @@ const AdminLogin = () => {
 
     } catch (error: any) {
       console.error('❌ Admin login error:', error);
-      setError('Invalid email or password. Please try again.');
+      setError(error.message || 'Invalid email or password. Please try again.');
       toast({
         title: "Login Failed",
         description: error.message || "Invalid credentials",
@@ -132,13 +142,24 @@ const AdminLogin = () => {
     setError('');
 
     try {
-      console.log('📝 Admin signup attempt:', formData.email);
+      console.log('📝 Admin signup attempt for:', formData.email);
+
+      // Validate required fields
+      if (!formData.email || !formData.password || !formData.name) {
+        throw new Error('Please fill in all required fields');
+      }
+
+      if (formData.password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+
+      const emailToCheck = formData.email.toLowerCase().trim();
 
       // Check if admin already exists
       const { data: existingAdmin } = await supabase
         .from('admin_users')
         .select('email')
-        .eq('email', formData.email)
+        .eq('email', emailToCheck)
         .single();
 
       if (existingAdmin) {
@@ -147,45 +168,59 @@ const AdminLogin = () => {
 
       // Generate admin ID and hash password
       const adminId = generateAdminId();
-      const hashedPassword = await bcrypt.hash(formData.password, 10);
+      const hashedPassword = await bcrypt.hash(formData.password, 12);
 
       console.log('🆔 Generated Admin ID:', adminId);
+      console.log('🔐 Password hashed successfully');
 
       // Create admin user
       const { data: newAdmin, error: createError } = await supabase
         .from('admin_users')
         .insert({
-          email: formData.email,
+          email: emailToCheck,
           password_hash: hashedPassword,
-          name: formData.name,
+          name: formData.name.trim(),
           role: formData.role,
           is_active: true
         })
         .select()
         .single();
 
-      if (createError) throw createError;
+      if (createError) {
+        console.error('❌ Error creating admin user:', createError);
+        throw new Error('Failed to create admin account. Please try again.');
+      }
+
+      console.log('✅ Admin user created with ID:', newAdmin.id);
 
       // Create admin profile
-      await supabase
+      const { error: profileError } = await supabase
         .from('admin_profiles')
         .insert({
           admin_id: adminId,
           admin_user_id: newAdmin.id
         });
 
-      console.log('✅ Admin account created successfully');
+      if (profileError) {
+        console.error('❌ Error creating admin profile:', profileError);
+        // Clean up the admin user if profile creation fails
+        await supabase.from('admin_users').delete().eq('id', newAdmin.id);
+        throw new Error('Failed to create admin profile. Please try again.');
+      }
 
-      // Send confirmation email
+      console.log('✅ Admin profile created successfully');
+
+      // Send confirmation email (don't block signup if this fails)
       try {
         await sendAdminConfirmationEmail(formData.email, adminId, 'admin-signup');
+        console.log('✅ Confirmation email sent successfully');
       } catch (emailError) {
-        console.error('Email sending failed, but account creation continues:', emailError);
+        console.error('⚠️ Email sending failed, but account creation continues:', emailError);
       }
 
       toast({
         title: "Account Created Successfully",
-        description: "Redirecting to dashboard...",
+        description: "Your admin account has been created. Redirecting to dashboard...",
       });
 
       setTimeout(() => {
@@ -211,13 +246,19 @@ const AdminLogin = () => {
     setError('');
 
     try {
-      console.log('🔐 Admin forgot password request:', forgotPasswordEmail);
+      console.log('🔐 Admin forgot password request for:', forgotPasswordEmail);
+
+      if (!forgotPasswordEmail) {
+        throw new Error('Please enter your email address');
+      }
+
+      const emailToCheck = forgotPasswordEmail.toLowerCase().trim();
 
       // Check if admin exists
       const { data: adminUser, error: fetchError } = await supabase
         .from('admin_users')
         .select('id, email')
-        .eq('email', forgotPasswordEmail)
+        .eq('email', emailToCheck)
         .single();
 
       if (fetchError || !adminUser) {
@@ -282,7 +323,7 @@ const AdminLogin = () => {
         </CardHeader>
         
         <CardContent className="grid gap-4">
-          {error && <div className="text-red-500 text-sm">{error}</div>}
+          {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-md">{error}</div>}
 
           {showForgotPassword ? (
             <>
@@ -307,7 +348,7 @@ const AdminLogin = () => {
             <>
               {showSignUp && (
                 <div className="grid gap-2">
-                  <Label htmlFor="name">Name</Label>
+                  <Label htmlFor="name">Name <span className="text-red-500">*</span></Label>
                   <Input
                     id="name"
                     placeholder="Enter your name"
@@ -319,7 +360,7 @@ const AdminLogin = () => {
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email <span className="text-red-500">*</span></Label>
                 <Input
                   id="email"
                   placeholder="Enter your email"
@@ -330,7 +371,7 @@ const AdminLogin = () => {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Password <span className="text-red-500">*</span></Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -353,6 +394,9 @@ const AdminLogin = () => {
                     )}
                   </Button>
                 </div>
+                {showSignUp && (
+                  <p className="text-xs text-gray-500">Password must be at least 6 characters long</p>
+                )}
               </div>
 
               {showSignUp && (

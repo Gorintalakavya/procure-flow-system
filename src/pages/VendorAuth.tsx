@@ -4,11 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client";
 import bcrypt from 'bcryptjs';
-import { Separator } from "@/components/ui/separator"
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 interface FormData {
@@ -58,7 +57,8 @@ const VendorAuth = () => {
       return { success: true };
     } catch (error) {
       console.error('❌ Error sending confirmation email:', error);
-      throw error;
+      // Don't throw error here, just log it so signup/signin can continue
+      return { success: false, error };
     }
   };
 
@@ -77,30 +77,44 @@ const VendorAuth = () => {
     setError('');
 
     try {
-      console.log('🔐 Vendor sign in attempt:', formData.email);
+      console.log('🔐 Vendor sign in attempt for:', formData.email);
 
+      if (!formData.email || !formData.password) {
+        throw new Error('Please enter both email and password');
+      }
+
+      const emailToCheck = formData.email.toLowerCase().trim();
+
+      // Get user with vendor information
       const { data: user, error: fetchError } = await supabase
         .from('users')
         .select('*, vendors!inner(*)')
-        .eq('email', formData.email)
+        .eq('email', emailToCheck)
         .single();
 
       if (fetchError || !user) {
-        throw new Error('Invalid credentials for vendor: ' + formData.email);
+        console.error('❌ Vendor user not found:', fetchError);
+        throw new Error('Invalid email or password. Please check your credentials.');
       }
 
+      console.log('👤 Found vendor user:', user.email);
+
+      // Verify password
       const isValidPassword = await bcrypt.compare(formData.password || '', user.password_hash);
       if (!isValidPassword) {
-        throw new Error('Invalid credentials for vendor: ' + formData.email);
+        console.error('❌ Invalid password for vendor:', user.email);
+        throw new Error('Invalid email or password. Please check your credentials.');
       }
 
-      console.log('✅ Vendor login successful');
+      console.log('✅ Vendor password validated successfully');
+      console.log('✅ Vendor login successful. Vendor ID:', user.vendors.vendor_id);
 
-      // Send confirmation email
+      // Send confirmation email (don't block login if this fails)
       try {
         await sendConfirmationEmail(user.email, user.vendors.vendor_id, 'signin');
+        console.log('✅ Confirmation email sent successfully');
       } catch (emailError) {
-        console.error('Email sending failed, but login continues:', emailError);
+        console.error('⚠️ Email sending failed, but login continues:', emailError);
       }
 
       toast({
@@ -113,11 +127,11 @@ const VendorAuth = () => {
       }, 1500);
 
     } catch (error: any) {
-      console.error('❌ Invalid credentials for vendor:', formData.email);
-      setError('Invalid email or password. Please try again.');
+      console.error('❌ Vendor login error:', error);
+      setError(error.message || 'Invalid email or password. Please try again.');
       toast({
         title: "Login Failed",
-        description: "Invalid credentials",
+        description: error.message || "Invalid credentials",
         variant: "destructive",
       });
     } finally {
@@ -131,13 +145,24 @@ const VendorAuth = () => {
     setError('');
 
     try {
-      console.log('📝 Vendor signup attempt:', formData.email);
+      console.log('📝 Vendor signup attempt for:', formData.email);
+
+      // Validate required fields
+      if (!formData.email || !formData.password || !formData.name || !formData.companyName) {
+        throw new Error('Please fill in all required fields');
+      }
+
+      if (formData.password.length < 6) {
+        throw new Error('Password must be at least 6 characters long');
+      }
+
+      const emailToCheck = formData.email.toLowerCase().trim();
 
       // Check if user already exists
       const { data: existingUser } = await supabase
         .from('users')
         .select('email')
-        .eq('email', formData.email)
+        .eq('email', emailToCheck)
         .single();
 
       if (existingUser) {
@@ -146,31 +171,38 @@ const VendorAuth = () => {
 
       // Generate vendor ID and hash password
       const vendorId = generateVendorId();
-      const hashedPassword = await bcrypt.hash(formData.password || '', 10);
+      const hashedPassword = await bcrypt.hash(formData.password || '', 12);
 
       console.log('🆔 Generated Vendor ID:', vendorId);
+      console.log('🔐 Password hashed successfully');
 
       // Create user
       const { data: newUser, error: userError } = await supabase
         .from('users')
         .insert({
-          email: formData.email,
+          email: emailToCheck,
           password_hash: hashedPassword,
-          is_authenticated: true
+          is_authenticated: true,
+          vendor_id: vendorId
         })
         .select()
         .single();
 
-      if (userError) throw userError;
+      if (userError) {
+        console.error('❌ Error creating user:', userError);
+        throw new Error('Failed to create user account. Please try again.');
+      }
+
+      console.log('✅ User created with ID:', newUser.id);
 
       // Create vendor record
       const { error: vendorError } = await supabase
         .from('vendors')
         .insert({
           vendor_id: vendorId,
-          legal_entity_name: formData.companyName || 'New Vendor',
-          email: formData.email,
-          contact_name: formData.name || '',
+          legal_entity_name: formData.companyName?.trim() || 'New Vendor',
+          email: emailToCheck,
+          contact_name: formData.name?.trim() || '',
           vendor_type: 'corporation',
           street_address: '123 Main St',
           city: 'New York',
@@ -181,26 +213,26 @@ const VendorAuth = () => {
           currency: 'USD'
         });
 
-      if (vendorError) throw vendorError;
-
-      // Update user with vendor_id
-      await supabase
-        .from('users')
-        .update({ vendor_id: vendorId })
-        .eq('id', newUser.id);
+      if (vendorError) {
+        console.error('❌ Error creating vendor:', vendorError);
+        // Clean up the user if vendor creation fails
+        await supabase.from('users').delete().eq('id', newUser.id);
+        throw new Error('Failed to create vendor profile. Please try again.');
+      }
 
       console.log('✅ Vendor account created successfully');
 
-      // Send confirmation email
+      // Send confirmation email (don't block signup if this fails)
       try {
         await sendConfirmationEmail(formData.email, vendorId, 'signup');
+        console.log('✅ Confirmation email sent successfully');
       } catch (emailError) {
-        console.error('Email sending failed, but account creation continues:', emailError);
+        console.error('⚠️ Email sending failed, but account creation continues:', emailError);
       }
 
       toast({
         title: "Account Created Successfully",
-        description: "Welcome! Redirecting to your profile...",
+        description: "Welcome! Your vendor account has been created. Redirecting to your profile...",
       });
 
       setTimeout(() => {
@@ -226,12 +258,18 @@ const VendorAuth = () => {
     setError('');
 
     try {
-      console.log('🔐 Vendor forgot password request:', forgotPasswordEmail);
+      console.log('🔐 Vendor forgot password request for:', forgotPasswordEmail);
+
+      if (!forgotPasswordEmail) {
+        throw new Error('Please enter your email address');
+      }
+
+      const emailToCheck = forgotPasswordEmail.toLowerCase().trim();
 
       const { data: user, error: fetchError } = await supabase
         .from('users')
         .select('*, vendors!inner(*)')
-        .eq('email', forgotPasswordEmail)
+        .eq('email', emailToCheck)
         .single();
 
       if (fetchError || !user) {
@@ -288,7 +326,7 @@ const VendorAuth = () => {
         </CardHeader>
         
         <CardContent className="grid gap-4">
-          {error && <div className="text-red-500 text-sm">{error}</div>}
+          {error && <div className="text-red-500 text-sm bg-red-50 p-3 rounded-md">{error}</div>}
 
           {showForgotPassword ? (
             <>
@@ -314,7 +352,7 @@ const VendorAuth = () => {
               {showSignUp && (
                 <>
                   <div className="grid gap-2">
-                    <Label htmlFor="name">Contact Name</Label>
+                    <Label htmlFor="name">Contact Name <span className="text-red-500">*</span></Label>
                     <Input
                       id="name"
                       placeholder="Enter contact name"
@@ -324,7 +362,7 @@ const VendorAuth = () => {
                     />
                   </div>
                   <div className="grid gap-2">
-                    <Label htmlFor="companyName">Company Name</Label>
+                    <Label htmlFor="companyName">Company Name <span className="text-red-500">*</span></Label>
                     <Input
                       id="companyName"
                       placeholder="Enter company name"
@@ -337,7 +375,7 @@ const VendorAuth = () => {
               )}
 
               <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email <span className="text-red-500">*</span></Label>
                 <Input
                   id="email"
                   placeholder="Enter your email"
@@ -348,7 +386,7 @@ const VendorAuth = () => {
               </div>
 
               <div className="grid gap-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password">Password <span className="text-red-500">*</span></Label>
                 <div className="relative">
                   <Input
                     id="password"
@@ -371,6 +409,9 @@ const VendorAuth = () => {
                     )}
                   </Button>
                 </div>
+                {showSignUp && (
+                  <p className="text-xs text-gray-500">Password must be at least 6 characters long</p>
+                )}
               </div>
 
               {showSignUp ? (
