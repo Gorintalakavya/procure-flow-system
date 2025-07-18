@@ -4,8 +4,8 @@ import { Resend } from "npm:resend@2.0.0";
 import sanitizeHtml from "npm:sanitize-html@2.17.0";
 
 // Environment variables validation
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const SITE_URL = Deno.env.get("SITE_URL") || "http://localhost:8080";
+const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "re_cCeBZSWk_93jQ7fCnjqq4ybQpXcdjSCQX";
+const SITE_URL = Deno.env.get("SITE_URL") || "https://xinxmjswzapwzbzhlbyo.lovableproject.com";
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
 const API_KEY = Deno.env.get("EMAIL_API_KEY") || "default-api-key";
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "http://localhost:8080,https://xinxmjswzapwzbzhlbyo.lovableproject.com").split(",");
@@ -29,11 +29,11 @@ const isValidEmail = (email: string): boolean => {
 };
 
 const isValidVendorId = (vendorId: string): boolean => {
-  return /^[A-Z0-9]{8,12}$/.test(vendorId);
+  return /^[A-Z0-9]{6,12}$/.test(vendorId);
 };
 
 const isValidAdminId = (adminId: string): boolean => {
-  return /^[A-Z0-9]{8,12}$/.test(adminId);
+  return /^ADM[A-Z0-9]{7}$/.test(adminId);
 };
 
 const VALID_ACTIONS = [
@@ -95,7 +95,7 @@ const generateEmailContent = (req: EmailRequest) => {
 
     case 'signin':
     case 'admin-signin':
-      subject = section === 'admin' ? 'Admin Portal Login Confirmation' : `Vendor Portal Login Confirmation - ${vendorId}`;
+      subject = section === 'admin' ? 'Admin Portal Login Confirmation' : `Vendor Portal Login Confirmation`;
       content = `
         <h1>${section === 'admin' ? 'Admin' : 'Vendor'} Portal Login Confirmation</h1>
         <p>You have successfully signed in to your ${section} portal.</p>
@@ -176,16 +176,13 @@ const generateEmailContent = (req: EmailRequest) => {
       break;
 
     case 'forgot-password':
-      if (!resetToken) {
-        throw new Error('Reset token is required for password reset emails');
-      }
-      const resetUrl = `${baseUrl}/${section === 'admin' ? 'admin-login' : 'vendor-auth'}?reset=${resetToken}`;
+      const resetUrl = `${baseUrl}/${section === 'admin' ? 'admin-login' : 'vendor-auth'}?reset=true`;
       subject = 'Password Reset Request';
       content = `
         <h1>Password Reset Request</h1>
         <p>You requested a password reset for your ${section} account.</p>
         <p><strong>${idDisplay}</strong></p>
-        <p>Click the button below to reset your password. This link will expire in 1 hour.</p>
+        <p>Click the button below to reset your password.</p>
         <div style="margin: 20px 0;">
           <a href="${resetUrl}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
         </div>
@@ -241,16 +238,6 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // CORS origin validation
-    const origin = req.headers.get("origin");
-    if (origin && !ALLOWED_ORIGINS.includes(origin)) {
-      console.error(`Origin ${origin} not allowed`);
-      return new Response(JSON.stringify({ error: "Origin not allowed" }), {
-        status: 403,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
-    }
-
     const requestBody: EmailRequest = await req.json();
     console.log('Processing email request for:', requestBody.email, 'action:', requestBody.action);
 
@@ -265,18 +252,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!requestBody.action || !isValidAction(requestBody.action)) {
       throw new Error(`Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`);
-    }
-
-    // Validate vendor ID format if provided
-    if (requestBody.vendorId && !isValidVendorId(requestBody.vendorId)) {
-      console.error(`Invalid vendor ID format: ${requestBody.vendorId}`);
-      // Don't throw error, just log it and continue
-    }
-
-    // Validate admin ID format if provided
-    if (requestBody.adminId && !isValidAdminId(requestBody.adminId)) {
-      console.error(`Invalid admin ID format: ${requestBody.adminId}`);
-      // Don't throw error, just log it and continue
     }
 
     const { subject, content } = generateEmailContent(requestBody);
@@ -325,13 +300,6 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in send-confirmation-email function:", error);
     
-    // Log detailed error information
-    console.error("Error details:", {
-      message: error.message,
-      stack: error.stack,
-      name: error.name
-    });
-
     return new Response(JSON.stringify({ 
       error: "Internal server error",
       details: Deno.env.get("DEBUG") === "true" ? error.message : undefined

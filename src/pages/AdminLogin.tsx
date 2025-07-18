@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +14,7 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -25,6 +25,7 @@ const AdminLogin = () => {
     password: '',
     confirmPassword: ''
   });
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
 
   const generateUniqueAdminId = () => {
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -46,30 +47,90 @@ const AdminLogin = () => {
     try {
       console.log('📧 Sending admin confirmation email...');
       
-      const { error } = await supabase.functions.invoke('send-confirmation-email', {
-        body: {
+      const response = await fetch('/api/send-confirmation-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': 'default-api-key'
+        },
+        body: JSON.stringify({
           email,
           adminId,
           section: 'admin',
           action,
           password,
           isNewAccount: !!password,
-          apiKey: 'default-key'
-        }
+          siteName: 'Vendor Management Portal',
+          siteUrl: window.location.origin
+        })
       });
 
-      if (error) {
-        console.error('❌ Error sending admin confirmation email:', error);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Error sending admin confirmation email:', errorText);
         toast.error('Failed to send confirmation email');
         return false;
       } else {
-        console.log('✅ Admin confirmation email sent successfully');
+        const result = await response.json();
+        console.log('✅ Admin confirmation email sent successfully:', result);
         return true;
       }
     } catch (error) {
       console.error('❌ Error invoking admin email function:', error);
       toast.error('Failed to send confirmation email');
       return false;
+    }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+
+    try {
+      console.log('🔐 Admin forgot password request:', forgotPasswordEmail);
+
+      const { data: adminData, error: adminError } = await supabase
+        .from('admin_users')
+        .select('*')
+        .eq('email', forgotPasswordEmail)
+        .eq('is_active', true)
+        .single();
+
+      if (adminError || !adminData) {
+        toast.error('No admin account found with this email address');
+        return;
+      }
+
+      const { data: profileData } = await supabase
+        .from('admin_profiles')
+        .select('*')
+        .eq('admin_user_id', adminData.id)
+        .single();
+
+      const adminProfileData = profileData || { admin_id: 'N/A' };
+      const resetToken = Math.random().toString(36).substring(2, 15);
+
+      const emailSent = await sendAdminConfirmationEmail(
+        adminData.email, 
+        adminProfileData.admin_id, 
+        'forgot-password',
+        undefined
+      );
+      
+      if (emailSent) {
+        toast.success('Password reset instructions sent to your email address.');
+      } else {
+        toast.error('Failed to send password reset email');
+      }
+
+      setShowForgotPassword(false);
+      setForgotPasswordEmail('');
+
+    } catch (error) {
+      console.error('❌ Admin forgot password error:', error);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -89,7 +150,7 @@ const AdminLogin = () => {
         .single();
 
       if (adminError || !adminData) {
-        console.error('❌ Invalid password for admin:', loginData.email);
+        console.error('❌ Invalid credentials for admin:', loginData.email);
         toast.error('Invalid email or password');
         return;
       }
@@ -205,7 +266,7 @@ const AdminLogin = () => {
 
       console.log('✅ Admin account created successfully');
 
-      const emailSent = await sendAdminConfirmationEmail(newAdmin.email, adminId, 'admin-signup', signupData.password);
+      const emailSent = await sendAdminConfirmationEmail(newAdmin.email, adminId, 'admin-signup');
       
       if (emailSent) {
         toast.success('Admin account created successfully! Confirmation email sent to your email address.');
@@ -224,6 +285,85 @@ const AdminLogin = () => {
       setIsLoading(false);
     }
   };
+
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+        <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/')}
+                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Home
+                </Button>
+                <div className="flex items-center space-x-3">
+                  <Shield className="h-8 w-8 text-purple-600" />
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
+                    <p className="text-sm text-slate-600">Secure administrator access</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center py-12">
+          <div className="max-w-md w-full mx-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-center">Reset Password</CardTitle>
+                <CardDescription className="text-center">
+                  Enter your email address to receive password reset instructions
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div>
+                    <Label htmlFor="forgot-email">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="forgot-email"
+                        type="email"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                        placeholder="Enter your admin email"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full bg-purple-600 hover:bg-purple-700"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Sending...' : 'Send Reset Instructions'}
+                  </Button>
+
+                  <Button 
+                    type="button"
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => setShowForgotPassword(false)}
+                  >
+                    Back to Sign In
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
@@ -314,6 +454,15 @@ const AdminLogin = () => {
                       disabled={isLoading}
                     >
                       {isLoading ? 'Signing In...' : 'Sign In'}
+                    </Button>
+
+                    <Button 
+                      type="button"
+                      variant="ghost"
+                      className="w-full text-sm"
+                      onClick={() => setShowForgotPassword(true)}
+                    >
+                      Forgot Password?
                     </Button>
                   </form>
                 </TabsContent>

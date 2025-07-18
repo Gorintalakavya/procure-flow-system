@@ -125,8 +125,13 @@ const AdminVendorManagement = () => {
         console.log('Sending confirmation email to:', vendor.email);
         
         try {
-          const { data: emailData, error: emailError } = await supabase.functions.invoke('send-confirmation-email', {
-            body: {
+          const response = await fetch('/api/send-confirmation-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': 'default-api-key'
+            },
+            body: JSON.stringify({
               email: vendor.email,
               vendorId: vendorId,
               section: 'vendor',
@@ -134,14 +139,16 @@ const AdminVendorManagement = () => {
               notes: notes || '',
               siteName: 'Vendor Management Portal',
               siteUrl: window.location.origin
-            }
+            })
           });
 
-          if (emailError) {
-            console.error('Email sending error:', emailError);
-            toast.error(`Vendor status updated to ${newStatus}, but email failed to send: ${emailError.message}`);
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Email sending error:', errorText);
+            toast.error(`Vendor status updated to ${newStatus}, but email failed to send`);
           } else {
-            console.log('Email sent successfully:', emailData);
+            const result = await response.json();
+            console.log('Email sent successfully:', result);
             toast.success(`Vendor status updated to ${newStatus}. Confirmation email sent successfully.`);
           }
         } catch (emailErr) {
@@ -176,10 +183,14 @@ const AdminVendorManagement = () => {
       ];
 
       for (const table of tablesToClean) {
-        await supabase
-          .from(table)
+        const { error } = await supabase
+          .from(table as any)
           .delete()
           .eq('vendor_id', vendorId);
+        
+        if (error) {
+          console.warn(`Warning cleaning ${table}:`, error);
+        }
       }
 
       // Delete users associated with this vendor
@@ -199,8 +210,13 @@ const AdminVendorManagement = () => {
       // Send deletion notification email
       if (vendor) {
         try {
-          await supabase.functions.invoke('send-confirmation-email', {
-            body: {
+          await fetch('/api/send-confirmation-email', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'x-api-key': 'default-api-key'
+            },
+            body: JSON.stringify({
               email: vendor.email,
               vendorId: vendorId,
               section: 'vendor',
@@ -208,7 +224,7 @@ const AdminVendorManagement = () => {
               notes: 'Your vendor account has been permanently deleted by an administrator.',
               siteName: 'Vendor Management Portal',
               siteUrl: window.location.origin
-            }
+            })
           });
         } catch (emailError) {
           console.error('Failed to send deletion notification:', emailError);
@@ -259,7 +275,7 @@ const AdminVendorManagement = () => {
 
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = window.document.createElement('a');
     a.href = url;
     a.download = 'vendors_export.csv';
     a.click();

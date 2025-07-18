@@ -7,7 +7,6 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Upload, FileText, Download, Trash2, Eye, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import DocumentUpload from "./DocumentUpload";
 
 interface VendorData {
   vendor_id: string;
@@ -38,6 +37,7 @@ const VendorDocumentsSection: React.FC<VendorDocumentsSectionProps> = ({ vendor,
   const [isLoading, setIsLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [deleteDocument, setDeleteDocument] = useState<Document | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchDocuments();
@@ -107,7 +107,7 @@ const VendorDocumentsSection: React.FC<VendorDocumentsSectionProps> = ({ vendor,
       if (error) throw error;
 
       const url = window.URL.createObjectURL(data);
-      const a = document.createElement('a');
+      const a = window.document.createElement('a');
       a.href = url;
       a.download = document.document_name;
       a.click();
@@ -118,10 +118,46 @@ const VendorDocumentsSection: React.FC<VendorDocumentsSectionProps> = ({ vendor,
     }
   };
 
-  const handleUploadSuccess = () => {
-    fetchDocuments();
-    setShowUpload(false);
-    toast.success('Document uploaded successfully');
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${vendor.vendor_id}/${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('vendor-documents')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { error: dbError } = await supabase
+        .from('vendor_documents')
+        .insert({
+          vendor_id: vendor.vendor_id,
+          document_name: file.name,
+          document_type: fileExt || 'unknown',
+          document_category: 'general',
+          file_path: fileName,
+          file_size: file.size,
+          mime_type: file.type,
+          uploaded_by: 'vendor',
+          status: 'pending'
+        });
+
+      if (dbError) throw dbError;
+
+      toast.success('Document uploaded successfully');
+      fetchDocuments();
+      setShowUpload(false);
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      toast.error('Failed to upload document');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const getStatusBadge = (status: string) => {
@@ -164,10 +200,33 @@ const VendorDocumentsSection: React.FC<VendorDocumentsSectionProps> = ({ vendor,
           <h3 className="text-xl font-semibold">Verification Documents</h3>
           <p className="text-sm text-gray-600">Upload and manage required verification documents</p>
         </div>
-        <Button onClick={() => setShowUpload(true)} className="flex items-center gap-2">
-          <Upload className="h-4 w-4" />
-          Upload Document
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowUpload(true)} className="flex items-center gap-2">
+            <Upload className="h-4 w-4" />
+            Upload Document
+          </Button>
+          {showUpload && (
+            <div className="flex items-center gap-2">
+              <input
+                type="file"
+                onChange={handleFileUpload}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                disabled={uploading}
+                className="hidden"
+                id="file-upload"
+              />
+              <label
+                htmlFor="file-upload"
+                className="cursor-pointer bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 disabled:opacity-50"
+              >
+                {uploading ? 'Uploading...' : 'Choose File'}
+              </label>
+              <Button variant="outline" onClick={() => setShowUpload(false)}>
+                Cancel
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
 
       {documents.length === 0 ? (
@@ -239,15 +298,6 @@ const VendorDocumentsSection: React.FC<VendorDocumentsSectionProps> = ({ vendor,
             </Card>
           ))}
         </div>
-      )}
-
-      {/* Upload Modal */}
-      {showUpload && (
-        <DocumentUpload
-          vendorId={vendor.vendor_id}
-          onUploadSuccess={handleUploadSuccess}
-          onClose={() => setShowUpload(false)}
-        />
       )}
 
       {/* Delete Confirmation Dialog */}

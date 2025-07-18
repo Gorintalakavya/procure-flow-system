@@ -40,6 +40,26 @@ const VendorDirectory = () => {
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
 
+  // US States for location filter
+  const usStates = [
+    'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware',
+    'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky',
+    'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi',
+    'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico',
+    'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania',
+    'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont',
+    'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
+  ];
+
+  // US Business Types/Industries
+  const usBusinessTypes = [
+    'Technology Services', 'Manufacturing', 'Healthcare Services', 'Financial Services',
+    'Professional Services', 'Construction', 'Retail Trade', 'Transportation & Logistics',
+    'Real Estate', 'Education Services', 'Government Contractor', 'Energy & Utilities',
+    'Telecommunications', 'Hospitality', 'Agriculture', 'Consulting', 'Software Development',
+    'Engineering Services', 'Marketing & Advertising', 'Legal Services'
+  ];
+
   useEffect(() => {
     fetchVendors();
   }, []);
@@ -55,6 +75,7 @@ const VendorDirectory = () => {
         .from('vendors')
         .select('*')
         .eq('registration_status', 'approved')
+        .eq('country', 'United States')
         .order('legal_entity_name', { ascending: true });
 
       if (error) throw error;
@@ -93,8 +114,7 @@ const VendorDirectory = () => {
 
     if (locationFilter !== 'all') {
       filtered = filtered.filter(vendor => 
-        vendor.state.toLowerCase() === locationFilter.toLowerCase() ||
-        vendor.country.toLowerCase() === locationFilter.toLowerCase()
+        vendor.state === locationFilter
       );
     }
 
@@ -103,12 +123,14 @@ const VendorDirectory = () => {
 
   const getUniqueStates = () => {
     const states = vendors.map(v => v.state).filter(Boolean);
-    return [...new Set(states)].sort();
+    const uniqueStates = [...new Set(states)].sort();
+    return uniqueStates.filter(state => usStates.includes(state));
   };
 
   const getUniqueTypes = () => {
     const types = vendors.map(v => v.vendor_type).filter(Boolean);
-    return [...new Set(types)].sort();
+    const uniqueTypes = [...new Set(types)].sort();
+    return uniqueTypes.filter(type => usBusinessTypes.includes(type));
   };
 
   const handleViewDetails = (vendor: Vendor) => {
@@ -127,8 +149,8 @@ const VendorDirectory = () => {
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-3xl font-bold mb-2">Vendor Directory</h2>
-        <p className="text-gray-600">Browse our network of approved vendors</p>
+        <h2 className="text-3xl font-bold mb-2">US Vendor Directory</h2>
+        <p className="text-gray-600">Browse our network of approved US-based vendors</p>
       </div>
 
       {/* Filters */}
@@ -146,12 +168,12 @@ const VendorDirectory = () => {
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder="Filter by industry" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                {getUniqueTypes().map(type => (
-                  <SelectItem key={type} value={type} className="capitalize">
+                <SelectItem value="all">All Industries</SelectItem>
+                {usBusinessTypes.map(type => (
+                  <SelectItem key={type} value={type}>
                     {type}
                   </SelectItem>
                 ))}
@@ -159,11 +181,11 @@ const VendorDirectory = () => {
             </Select>
             <Select value={locationFilter} onValueChange={setLocationFilter}>
               <SelectTrigger>
-                <SelectValue placeholder="Filter by location" />
+                <SelectValue placeholder="Filter by state" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Locations</SelectItem>
-                {getUniqueStates().map(state => (
+                <SelectItem value="all">All States</SelectItem>
+                {usStates.map(state => (
                   <SelectItem key={state} value={state}>
                     {state}
                   </SelectItem>
@@ -262,7 +284,7 @@ const VendorDirectory = () => {
                   <p className="text-gray-600">{selectedVendor.legal_entity_name}</p>
                 </div>
                 <div>
-                  <h4 className="font-medium text-gray-900">Vendor Type</h4>
+                  <h4 className="font-medium text-gray-900">Industry</h4>
                   <Badge variant="outline" className="capitalize">
                     {selectedVendor.vendor_type}
                   </Badge>
