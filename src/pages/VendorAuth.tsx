@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client";
 import bcrypt from 'bcryptjs';
 import { Separator } from "@/components/ui/separator"
+import { Eye, EyeOff, ArrowLeft } from 'lucide-react';
 
 interface FormData {
   email: string;
@@ -26,8 +27,10 @@ const VendorAuth = () => {
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showSignUp, setShowSignUp] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -86,7 +89,7 @@ const VendorAuth = () => {
         throw new Error('Invalid credentials for vendor: ' + formData.email);
       }
 
-      const isValidPassword = await bcrypt.compare(formData.password, user.password_hash);
+      const isValidPassword = await bcrypt.compare(formData.password || '', user.password_hash);
       if (!isValidPassword) {
         throw new Error('Invalid credentials for vendor: ' + formData.email);
       }
@@ -143,7 +146,7 @@ const VendorAuth = () => {
 
       // Generate vendor ID and hash password
       const vendorId = generateVendorId();
-      const hashedPassword = await bcrypt.hash(formData.password, 10);
+      const hashedPassword = await bcrypt.hash(formData.password || '', 10);
 
       console.log('🆔 Generated Vendor ID:', vendorId);
 
@@ -225,7 +228,6 @@ const VendorAuth = () => {
     try {
       console.log('🔐 Vendor forgot password request:', forgotPasswordEmail);
 
-      // Check if vendor exists
       const { data: user, error: fetchError } = await supabase
         .from('users')
         .select('*, vendors!inner(*)')
@@ -236,10 +238,6 @@ const VendorAuth = () => {
         throw new Error('No vendor account found with this email address');
       }
 
-      // Generate reset token (in production, store this in database)
-      const resetToken = crypto.randomUUID();
-
-      // Send forgot password email
       await sendConfirmationEmail(
         forgotPasswordEmail,
         user.vendors.vendor_id,
@@ -271,96 +269,138 @@ const VendorAuth = () => {
     <div className="flex justify-center items-center min-h-screen bg-gray-100">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl text-center">Vendor Authentication</CardTitle>
-          <CardDescription className="text-center">Sign in or create an account to continue</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-4">
-          <div className="grid gap-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-            />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              value={formData.password || ''}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-            />
-          </div>
-          {error && <p className="text-red-500">{error}</p>}
-          <Button disabled={isLoading} onClick={handleSignIn}>
-            {isLoading ? 'Signing In...' : 'Sign In'}
-          </Button>
-        </CardContent>
-        <CardFooter className="flex flex-col space-y-2">
-          <Button variant="link" onClick={() => setShowForgotPassword(true)}>
-            Forgot Password?
-          </Button>
-          <Separator />
-          <div className="relative w-full">
-            <Button variant="outline" onClick={() => navigate('/vendor-registration')}>
-              Create Vendor Account
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate('/')}
+              className="p-1"
+            >
+              <ArrowLeft className="h-4 w-4" />
             </Button>
+            <CardTitle className="text-2xl">
+              {showForgotPassword ? "Reset Password" : showSignUp ? "Vendor Sign Up" : "Vendor Authentication"}
+            </CardTitle>
           </div>
-        </CardFooter>
-      </Card>
+          <CardDescription>
+            {showForgotPassword ? "Enter your email to reset password" : showSignUp ? "Create a new vendor account" : "Sign in or create an account to continue"}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="grid gap-4">
+          {error && <div className="text-red-500 text-sm">{error}</div>}
 
-      {showForgotPassword && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center">
-          <div className="relative p-4 w-full max-w-md h-full">
-            <div className="relative bg-white rounded-lg shadow dark:bg-gray-700">
-              <button
-                type="button"
-                className="absolute top-3 right-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center dark:hover:bg-gray-800 dark:hover:text-white"
-                onClick={() => setShowForgotPassword(false)}
-              >
-                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-                  <path
-                    fillRule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clipRule="evenodd"
-                  ></path>
-                </svg>
-              </button>
-              <div className="p-6 text-center">
-                <svg className="mx-auto mb-4 w-14 h-14 text-gray-400 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                </svg>
-                <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
-                  Enter your email to reset your password
-                </h3>
-                <input
+          {showForgotPassword ? (
+            <>
+              <div className="grid gap-2">
+                <Label htmlFor="forgot-password-email">Email</Label>
+                <Input
+                  id="forgot-password-email"
+                  placeholder="Enter your email"
                   type="email"
-                  className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
-                  placeholder="Email address"
                   value={forgotPasswordEmail}
                   onChange={(e) => setForgotPasswordEmail(e.target.value)}
                 />
-                <Button
-                  className="inline-flex items-center px-5 py-2.5 text-sm font-medium text-center text-white bg-red-600 rounded-lg focus:ring-4 focus:outline-none focus:ring-red-300 dark:bg-red-500 dark:hover:bg-red-600 dark:focus:ring-red-900"
-                  onClick={handleForgotPassword}
-                  disabled={isLoading}
-                >
-                  {isLoading ? 'Sending...' : 'Send Reset Email'}
-                </Button>
-                <button
-                  type="button"
-                  className="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
-                  onClick={() => setShowForgotPassword(false)}
-                >
-                  Cancel
-                </button>
               </div>
-            </div>
-          </div>
-        </div>
-      )}
+              <Button disabled={isLoading} onClick={handleForgotPassword} className="w-full">
+                {isLoading ? "Sending Reset Email..." : "Send Reset Email"}
+              </Button>
+              <Button variant="link" onClick={() => setShowForgotPassword(false)}>
+                Back to Login
+              </Button>
+            </>
+          ) : (
+            <>
+              {showSignUp && (
+                <>
+                  <div className="grid gap-2">
+                    <Label htmlFor="name">Contact Name</Label>
+                    <Input
+                      id="name"
+                      placeholder="Enter contact name"
+                      type="text"
+                      value={formData.name || ''}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                    />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="companyName">Company Name</Label>
+                    <Input
+                      id="companyName"
+                      placeholder="Enter company name"
+                      type="text"
+                      value={formData.companyName || ''}
+                      onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="grid gap-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  placeholder="Enter your email"
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label htmlFor="password">Password</Label>
+                <div className="relative">
+                  <Input
+                    id="password"
+                    placeholder="Enter your password"
+                    type={showPassword ? "text" : "password"}
+                    value={formData.password || ''}
+                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+
+              {showSignUp ? (
+                <Button disabled={isLoading} onClick={handleSignUp} className="w-full">
+                  {isLoading ? "Creating Account..." : "Create Account"}
+                </Button>
+              ) : (
+                <Button disabled={isLoading} onClick={handleSignIn} className="w-full">
+                  {isLoading ? "Signing In..." : "Sign In"}
+                </Button>
+              )}
+
+              <div className="flex justify-between text-sm">
+                {!showSignUp ? (
+                  <Button variant="link" onClick={() => setShowSignUp(true)}>
+                    Create Account
+                  </Button>
+                ) : (
+                  <Button variant="link" onClick={() => setShowSignUp(false)}>
+                    Already have an account?
+                  </Button>
+                )}
+                <Button variant="link" onClick={() => setShowForgotPassword(true)}>
+                  Forgot Password?
+                </Button>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };
