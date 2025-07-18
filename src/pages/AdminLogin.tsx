@@ -1,11 +1,11 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Shield, Mail, Lock, User, ArrowLeft, Eye, EyeOff, UserCheck } from "lucide-react";
+import { Shield, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,7 +15,6 @@ const AdminLogin = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -24,10 +23,8 @@ const AdminLogin = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: '',
-    role: ''
+    confirmPassword: ''
   });
-  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
 
   const generateUniqueAdminId = () => {
     const letters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -45,88 +42,34 @@ const AdminLogin = () => {
     return result;
   };
 
-  const sendAdminConfirmationEmail = async (email: string, adminId: string, action: string) => {
+  const sendAdminConfirmationEmail = async (email: string, adminId: string, action: string, password?: string) => {
     try {
-      console.log('📧 Sending admin confirmation email for action:', action);
+      console.log('📧 Sending admin confirmation email...');
       
-      const response = await fetch('https://xinxmjswzapwzbzhlbyo.supabase.co/functions/v1/send-confirmation-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpbnhtanN3emFwd3piemhsYnlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ0NTQsImV4cCI6MjA2NjQxMDQ1NH0.Z3gyf7O3CSrNirIUn1sW_3H6hExr5BQPtQEML9j01JI`
-        },
-        body: JSON.stringify({
+      const { error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
           email,
           adminId,
           section: 'admin',
           action,
-          siteName: 'Vendor Management Portal',
-          siteUrl: window.location.origin
-        })
+          password,
+          isNewAccount: !!password,
+          apiKey: 'default-key'
+        }
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error sending admin confirmation email:', errorText);
+      if (error) {
+        console.error('❌ Error sending admin confirmation email:', error);
+        toast.error('Failed to send confirmation email');
         return false;
       } else {
-        const result = await response.json();
-        console.log('✅ Admin confirmation email sent successfully:', result);
+        console.log('✅ Admin confirmation email sent successfully');
         return true;
       }
     } catch (error) {
       console.error('❌ Error invoking admin email function:', error);
+      toast.error('Failed to send confirmation email');
       return false;
-    }
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      console.log('🔐 Admin forgot password request:', forgotPasswordEmail);
-
-      const { data: adminData, error: adminError } = await supabase
-        .from('admin_users')
-        .select('*')
-        .eq('email', forgotPasswordEmail)
-        .eq('is_active', true)
-        .single();
-
-      if (adminError || !adminData) {
-        toast.error('No admin account found with this email address');
-        return;
-      }
-
-      const { data: profileData } = await supabase
-        .from('admin_profiles')
-        .select('*')
-        .eq('admin_user_id', adminData.id)
-        .single();
-
-      const adminProfileData = profileData || { admin_id: 'N/A' };
-
-      const emailSent = await sendAdminConfirmationEmail(
-        adminData.email, 
-        adminProfileData.admin_id, 
-        'forgot-password'
-      );
-      
-      if (emailSent) {
-        toast.success('Password reset instructions sent to your email address.');
-      } else {
-        toast.error('Failed to send password reset email');
-      }
-
-      setShowForgotPassword(false);
-      setForgotPasswordEmail('');
-
-    } catch (error) {
-      console.error('❌ Admin forgot password error:', error);
-      toast.error('An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -146,7 +89,7 @@ const AdminLogin = () => {
         .single();
 
       if (adminError || !adminData) {
-        console.error('❌ Invalid credentials for admin:', loginData.email);
+        console.error('❌ Invalid password for admin:', loginData.email);
         toast.error('Invalid email or password');
         return;
       }
@@ -170,7 +113,6 @@ const AdminLogin = () => {
 
       console.log('✅ Admin login successful. Admin ID:', adminProfileData.admin_id);
 
-      // Send confirmation email for signin
       const emailSent = await sendAdminConfirmationEmail(adminData.email, adminProfileData.admin_id, 'admin-signin');
       
       if (emailSent) {
@@ -181,7 +123,7 @@ const AdminLogin = () => {
 
       setTimeout(() => {
         navigate('/admin-dashboard');
-      }, 1500);
+      }, 1000);
 
     } catch (error) {
       console.error('❌ Admin login error:', error);
@@ -201,11 +143,6 @@ const AdminLogin = () => {
 
     if (signupData.password.length < 6) {
       toast.error('Password must be at least 6 characters long');
-      return;
-    }
-
-    if (!signupData.role) {
-      toast.error('Please select a role');
       return;
     }
 
@@ -234,7 +171,7 @@ const AdminLogin = () => {
           name: signupData.name,
           email: signupData.email,
           password_hash: signupData.password,
-          role: signupData.role,
+          role: 'admin',
           is_active: true
         })
         .select()
@@ -268,18 +205,17 @@ const AdminLogin = () => {
 
       console.log('✅ Admin account created successfully');
 
-      // Send confirmation email for signup
-      const emailSent = await sendAdminConfirmationEmail(newAdmin.email, adminId, 'admin-signup');
+      const emailSent = await sendAdminConfirmationEmail(newAdmin.email, adminId, 'admin-signup', signupData.password);
       
       if (emailSent) {
-        toast.success('Admin account created successfully! Confirmation email sent. Redirecting to dashboard...');
+        toast.success('Admin account created successfully! Confirmation email sent to your email address.');
       } else {
-        toast.success('Admin account created successfully! Redirecting to dashboard...');
+        toast.success('Admin account created successfully!');
       }
 
       setTimeout(() => {
         navigate('/admin-dashboard');
-      }, 2000);
+      }, 1500);
 
     } catch (error) {
       console.error('❌ Error creating admin:', error);
@@ -289,89 +225,8 @@ const AdminLogin = () => {
     }
   };
 
-  if (showForgotPassword) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
-        
-        <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <div className="flex items-center space-x-4">
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate('/')}
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Home
-                </Button>
-                <div className="flex items-center space-x-3">
-                  <Shield className="h-8 w-8 text-purple-600" />
-                  <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
-                    <p className="text-sm text-slate-600">Secure administrator access</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-center py-12">
-          <div className="max-w-md w-full mx-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center">Reset Password</CardTitle>
-                <CardDescription className="text-center">
-                  Enter your email address to receive password reset instructions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleForgotPassword} className="space-y-4">
-                  <div>
-                    <Label htmlFor="forgot-email">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="forgot-email"
-                        type="email"
-                        value={forgotPasswordEmail}
-                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                        placeholder="Enter your admin email"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-purple-600 hover:bg-purple-700"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Sending...' : 'Send Reset Instructions'}
-                  </Button>
-
-                  <Button 
-                    type="button"
-                    variant="ghost"
-                    className="w-full"
-                    onClick={() => setShowForgotPassword(false)}
-                  >
-                    Back to Sign In
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
-      
       <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -460,15 +315,6 @@ const AdminLogin = () => {
                     >
                       {isLoading ? 'Signing In...' : 'Sign In'}
                     </Button>
-
-                    <Button 
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-sm"
-                      onClick={() => setShowForgotPassword(true)}
-                    >
-                      Forgot Password?
-                    </Button>
                   </form>
                 </TabsContent>
 
@@ -503,26 +349,6 @@ const AdminLogin = () => {
                           className="pl-10"
                           required
                         />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="signup-role">Role</Label>
-                      <div className="relative">
-                        <UserCheck className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
-                        <Select value={signupData.role} onValueChange={(value) => setSignupData(prev => ({ ...prev, role: value }))}>
-                          <SelectTrigger className="pl-10">
-                            <SelectValue placeholder="Select your role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="procurement-officer">Procurement Officer</SelectItem>
-                            <SelectItem value="finance-team">Finance Team</SelectItem>
-                            <SelectItem value="compliance-officer">Compliance Officer</SelectItem>
-                            <SelectItem value="manager">Manager</SelectItem>
-                            <SelectItem value="supervisor">Supervisor</SelectItem>
-                          </SelectContent>
-                        </Select>
                       </div>
                     </div>
 
