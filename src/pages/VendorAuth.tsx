@@ -1,352 +1,365 @@
-
 import React, { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Building2, Mail, Lock, ArrowLeft, Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { useNavigate } from 'react-router-dom';
+import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
+import { useToast } from "@/components/ui/use-toast"
 import { supabase } from "@/integrations/supabase/client";
+import * as bcrypt from 'bcryptjs';
+import { Separator } from "@/components/ui/separator"
+
+interface FormData {
+  email: string;
+  password?: string;
+  name?: string;
+  companyName?: string;
+}
 
 const VendorAuth = () => {
-  const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [loginData, setLoginData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     email: '',
-    password: ''
+    password: '',
+    name: '',
+    companyName: '',
   });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   const sendConfirmationEmail = async (email: string, vendorId: string, action: string) => {
     try {
-      console.log('🚀 Sending confirmation email for', action, 'to', email);
+      console.log(`🚀 Sending confirmation email for ${action} to ${email}`);
       
-      const response = await fetch('https://xinxmjswzapwzbzhlbyo.supabase.co/functions/v1/send-confirmation-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpbnhtanN3emFwd3piemhsYnlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ0NTQsImV4cCI6MjA2NjQxMDQ1NH0.Z3gyf7O3CSrNirIUn1sW_3H6hExr5BQPtQEML9j01JI`
-        },
-        body: JSON.stringify({
-          email,
-          vendorId,
+      const { data, error } = await supabase.functions.invoke('send-confirmation-email', {
+        body: {
+          email: email,
+          vendorId: vendorId,
           section: 'vendor',
-          action,
+          action: action,
           siteName: 'Vendor Management Portal',
           siteUrl: window.location.origin
-        })
+        }
       });
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Error sending confirmation email:', errorText);
-        return false;
-      } else {
-        const result = await response.json();
-        console.log('✅ Confirmation email sent successfully:', result);
-        return true;
+      if (error) {
+        console.error('❌ Error invoking email function:', error);
+        throw error;
       }
+
+      console.log('✅ Confirmation email sent successfully:', data);
+      return { success: true };
     } catch (error) {
       console.error('❌ Error sending confirmation email:', error);
-      return false;
+      throw error;
+    }
+  };
+
+  const generateVendorId = () => {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let vendorId = '';
+    for (let i = 0; i < 8; i++) {
+      vendorId += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return vendorId;
+  };
+
+  const handleSignIn = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      console.log('🔐 Vendor sign in attempt:', formData.email);
+
+      const { data: user, error: fetchError } = await supabase
+        .from('users')
+        .select('*, vendors!inner(*)')
+        .eq('email', formData.email)
+        .single();
+
+      if (fetchError || !user) {
+        throw new Error('Invalid credentials for vendor: ' + formData.email);
+      }
+
+      const isValidPassword = await bcrypt.compare(formData.password, user.password_hash);
+      if (!isValidPassword) {
+        throw new Error('Invalid credentials for vendor: ' + formData.email);
+      }
+
+      console.log('✅ Vendor login successful');
+
+      // Send confirmation email
+      try {
+        await sendConfirmationEmail(user.email, user.vendors.vendor_id, 'signin');
+      } catch (emailError) {
+        console.error('Email sending failed, but login continues:', emailError);
+      }
+
+      toast({
+        title: "Login Successful",
+        description: "Welcome back! Redirecting to your profile...",
+      });
+
+      setTimeout(() => {
+        navigate('/vendor-profile');
+      }, 1500);
+
+    } catch (error: any) {
+      console.error('❌ Invalid credentials for vendor:', formData.email);
+      setError('Invalid email or password. Please try again.');
+      toast({
+        title: "Login Failed",
+        description: "Invalid credentials",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+
+    try {
+      console.log('📝 Vendor signup attempt:', formData.email);
+
+      // Check if user already exists
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('email')
+        .eq('email', formData.email)
+        .single();
+
+      if (existingUser) {
+        throw new Error('Account with this email already exists');
+      }
+
+      // Generate vendor ID and hash password
+      const vendorId = generateVendorId();
+      const hashedPassword = await bcrypt.hash(formData.password, 10);
+
+      console.log('🆔 Generated Vendor ID:', vendorId);
+
+      // Create user
+      const { data: newUser, error: userError } = await supabase
+        .from('users')
+        .insert({
+          email: formData.email,
+          password_hash: hashedPassword,
+          is_authenticated: true
+        })
+        .select()
+        .single();
+
+      if (userError) throw userError;
+
+      // Create vendor record
+      const { error: vendorError } = await supabase
+        .from('vendors')
+        .insert({
+          vendor_id: vendorId,
+          legal_entity_name: formData.companyName || 'New Vendor',
+          email: formData.email,
+          contact_name: formData.name || '',
+          vendor_type: 'corporation',
+          street_address: '123 Main St',
+          city: 'New York',
+          state: 'NY',
+          postal_code: '10001',
+          country: 'US',
+          registration_status: 'pending',
+          currency: 'USD'
+        });
+
+      if (vendorError) throw vendorError;
+
+      // Update user with vendor_id
+      await supabase
+        .from('users')
+        .update({ vendor_id: vendorId })
+        .eq('id', newUser.id);
+
+      console.log('✅ Vendor account created successfully');
+
+      // Send confirmation email
+      try {
+        await sendConfirmationEmail(formData.email, vendorId, 'signup');
+      } catch (emailError) {
+        console.error('Email sending failed, but account creation continues:', emailError);
+      }
+
+      toast({
+        title: "Account Created Successfully",
+        description: "Welcome! Redirecting to your profile...",
+      });
+
+      setTimeout(() => {
+        navigate('/vendor-profile');
+      }, 1500);
+
+    } catch (error: any) {
+      console.error('❌ Vendor signup error:', error);
+      setError(error.message || 'Failed to create account');
+      toast({
+        title: "Signup Failed",
+        description: error.message || "Failed to create account",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setError('');
 
     try {
       console.log('🔐 Vendor forgot password request:', forgotPasswordEmail);
 
-      const { data: userData, error: userError } = await supabase
+      // Check if vendor exists
+      const { data: user, error: fetchError } = await supabase
         .from('users')
-        .select('*')
+        .select('*, vendors!inner(*)')
         .eq('email', forgotPasswordEmail)
         .single();
 
-      if (userError || !userData) {
-        toast.error('No vendor account found with this email address');
-        return;
+      if (fetchError || !user) {
+        throw new Error('No vendor account found with this email address');
       }
 
-      const emailSent = await sendConfirmationEmail(
-        userData.email, 
-        userData.vendor_id || 'N/A', 
+      // Generate reset token (in production, store this in database)
+      const resetToken = crypto.randomUUID();
+
+      // Send forgot password email
+      await sendConfirmationEmail(
+        forgotPasswordEmail,
+        user.vendors.vendor_id,
         'forgot-password'
       );
 
-      if (emailSent) {
-        toast.success('Password reset instructions sent to your email address.');
-      } else {
-        toast.error('Failed to send password reset email');
-      }
+      toast({
+        title: "Password Reset Email Sent",
+        description: "Please check your email for reset instructions.",
+      });
 
       setShowForgotPassword(false);
       setForgotPasswordEmail('');
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Vendor forgot password error:', error);
-      toast.error('An unexpected error occurred');
+      setError(error.message || 'Failed to send reset email');
+      toast({
+        title: "Reset Failed",
+        description: error.message || "Failed to send reset email",
+        variant: "destructive",
+      });
     } finally {
       setIsLoading(false);
     }
   };
-
-  const handleSignIn = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
-    try {
-      console.log('🔐 Vendor sign in attempt:', loginData.email);
-
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('*')
-        .eq('email', loginData.email)
-        .eq('password_hash', loginData.password)
-        .single();
-
-      if (userError || !userData) {
-        console.error('❌ Invalid credentials for vendor:', loginData.email);
-        toast.error('Invalid email or password');
-        return;
-      }
-
-      localStorage.setItem('vendorAuth', JSON.stringify({
-        id: userData.id,
-        email: userData.email,
-        vendorId: userData.vendor_id,
-        isAuthenticated: true
-      }));
-
-      console.log('✅ Vendor login successful');
-
-      // Send confirmation email for signin
-      const emailSent = await sendConfirmationEmail(userData.email, userData.vendor_id || 'N/A', 'signin');
-      
-      if (emailSent) {
-        toast.success('Login successful! Confirmation email sent. Redirecting...');
-      } else {
-        toast.success('Login successful! Redirecting...');
-      }
-
-      setTimeout(() => {
-        navigate('/vendor-profile');
-      }, 1500);
-
-    } catch (error) {
-      console.error('❌ Vendor login error:', error);
-      toast.error('An unexpected error occurred during login');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  if (showForgotPassword) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-        <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center py-4">
-              <div className="flex items-center space-x-4">
-                <Button
-                  variant="ghost"
-                  onClick={() => navigate('/')}
-                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
-                >
-                  <ArrowLeft className="h-4 w-4" />
-                  Back to Home
-                </Button>
-                <div className="flex items-center space-x-3">
-                  <Building2 className="h-8 w-8 text-blue-600" />
-                  <div>
-                    <h1 className="text-2xl font-bold text-slate-900">Vendor Portal</h1>
-                    <p className="text-sm text-slate-600">Access your vendor account</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-center py-12">
-          <div className="max-w-md w-full mx-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-center">Reset Password</CardTitle>
-                <CardDescription className="text-center">
-                  Enter your email address to receive password reset instructions
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <form onSubmit={handleForgotPassword} className="space-y-4">
-                  <div>
-                    <Label htmlFor="forgot-email">Email Address</Label>
-                    <div className="relative">
-                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                      <Input
-                        id="forgot-email"
-                        type="email"
-                        value={forgotPasswordEmail}
-                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
-                        placeholder="Enter your vendor email"
-                        className="pl-10"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <Button 
-                    type="submit" 
-                    className="w-full bg-blue-600 hover:bg-blue-700"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? 'Sending...' : 'Send Reset Instructions'}
-                  </Button>
-
-                  <Button 
-                    type="button"
-                    variant="ghost"
-                    className="w-full"
-                    onClick={() => setShowForgotPassword(false)}
-                  >
-                    Back to Sign In
-                  </Button>
-                </form>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                onClick={() => navigate('/')}
-                className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+    <div className="flex justify-center items-center min-h-screen bg-gray-100">
+      <Card className="w-full max-w-md">
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl text-center">Vendor Authentication</CardTitle>
+          <CardDescription className="text-center">Sign in or create an account to continue</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="grid gap-2">
+            <Label htmlFor="email">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              value={formData.email}
+              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+            />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="password">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              value={formData.password || ''}
+              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+            />
+          </div>
+          {error && <p className="text-red-500">{error}</p>}
+          <Button disabled={isLoading} onClick={handleSignIn}>
+            {isLoading ? 'Signing In...' : 'Sign In'}
+          </Button>
+        </CardContent>
+        <CardFooter className="flex flex-col space-y-2">
+          <Button variant="link" onClick={() => setShowForgotPassword(true)}>
+            Forgot Password?
+          </Button>
+          <Separator />
+          <div className="relative w-full">
+            <Button variant="outline" onClick={() => navigate('/vendor-registration')}>
+              Create Vendor Account
+            </Button>
+          </div>
+        </CardFooter>
+      </Card>
+
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full flex justify-center items-center">
+          <div className="relative p-4 w-full max-w-md h-full">
+            <div className="relative bg-white rounded-lg shadow dark:bg-gray-700">
+              <button
+                type="button"
+                className="absolute top-3 right-2.5 text-gray-400 bg-transparent hover:bg-gray-200 hover:text-gray-900 rounded-lg text-sm p-1.5 ml-auto inline-flex items-center dark:hover:bg-gray-800 dark:hover:text-white"
+                onClick={() => setShowForgotPassword(false)}
               >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Home
-              </Button>
-              <div className="flex items-center space-x-3">
-                <Building2 className="h-8 w-8 text-blue-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900">Vendor Portal</h1>
-                  <p className="text-sm text-slate-600">Access your vendor account</p>
-                </div>
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  ></path>
+                </svg>
+              </button>
+              <div className="p-6 text-center">
+                <svg className="mx-auto mb-4 w-14 h-14 text-gray-400 dark:text-gray-200" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h3 className="mb-5 text-lg font-normal text-gray-500 dark:text-gray-400">
+                  Enter your email to reset your password
+                </h3>
+                <input
+                  type="email"
+                  className="border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400 dark:text-white dark:focus:ring-blue-500 dark:focus:border-blue-500"
+                  placeholder="Email address"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                />
+                <Button
+                  className="inline-flex items-center px-5 py-2.5 text-sm font-medium text-center text-white bg-red-600 rounded-lg focus:ring-4 focus:outline-none focus:ring-red-300 dark:bg-red-500 dark:hover:bg-red-600 dark:focus:ring-red-900"
+                  onClick={handleForgotPassword}
+                  disabled={isLoading}
+                >
+                  {isLoading ? 'Sending...' : 'Send Reset Email'}
+                </Button>
+                <button
+                  type="button"
+                  className="text-gray-500 bg-white hover:bg-gray-100 focus:ring-4 focus:outline-none focus:ring-gray-200 rounded-lg border border-gray-200 text-sm font-medium px-5 py-2.5 hover:text-gray-900 focus:z-10 dark:bg-gray-700 dark:text-gray-300 dark:border-gray-500 dark:hover:text-white dark:hover:bg-gray-600 dark:focus:ring-gray-600"
+                  onClick={() => setShowForgotPassword(false)}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
         </div>
-      </div>
-
-      <div className="flex items-center justify-center py-12">
-        <div className="max-w-md w-full mx-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-center">Vendor Authentication</CardTitle>
-              <CardDescription className="text-center">
-                Sign in to your vendor account or register as a new vendor
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Tabs defaultValue="signin" className="w-full">
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="signin">Sign In</TabsTrigger>
-                  <TabsTrigger value="register">New Vendor</TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="signin">
-                  <form onSubmit={handleSignIn} className="space-y-4">
-                    <div>
-                      <Label htmlFor="signin-email">Email Address</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="signin-email"
-                          type="email"
-                          value={loginData.email}
-                          onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
-                          placeholder="Enter your email"
-                          className="pl-10"
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label htmlFor="signin-password">Password</Label>
-                      <div className="relative">
-                        <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          id="signin-password"
-                          type={showPassword ? "text" : "password"}
-                          value={loginData.password}
-                          onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                          placeholder="Enter your password"
-                          className="pl-10 pr-10"
-                          required
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
-                      </div>
-                    </div>
-
-                    <Button 
-                      type="submit" 
-                      className="w-full bg-blue-600 hover:bg-blue-700"
-                      disabled={isLoading}
-                    >
-                      {isLoading ? 'Signing In...' : 'Sign In'}
-                    </Button>
-
-                    <Button 
-                      type="button"
-                      variant="ghost"
-                      className="w-full text-sm"
-                      onClick={() => setShowForgotPassword(true)}
-                    >
-                      Forgot Password?
-                    </Button>
-                  </form>
-                </TabsContent>
-
-                <TabsContent value="register">
-                  <div className="text-center space-y-4">
-                    <p className="text-gray-600">New to our vendor network?</p>
-                    <Button 
-                      onClick={() => navigate('/vendor-registration')}
-                      className="w-full bg-green-600 hover:bg-green-700"
-                    >
-                      Start Vendor Registration
-                    </Button>
-                    <p className="text-xs text-gray-500">
-                      Complete our registration process to become an approved vendor
-                    </p>
-                  </div>
-                </TabsContent>
-              </Tabs>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+      )}
     </div>
   );
 };
