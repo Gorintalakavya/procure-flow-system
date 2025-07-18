@@ -3,16 +3,13 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { Resend } from "npm:resend@2.0.0";
 import sanitizeHtml from "npm:sanitize-html@2.17.0";
 
-// Environment variables validation
+// Use your provided credentials directly with fallbacks to environment variables
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "re_cCeBZSWk_93jQ7fCnjqq4ybQpXcdjSCQX";
-const SITE_URL = Deno.env.get("SITE_URL") || "https://xinxmjswzapwzbzhlbyo.lovableproject.com";
+const SITE_URL = Deno.env.get("SITE_URL") || "http://localhost:3000";
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
 const API_KEY = Deno.env.get("EMAIL_API_KEY") || "default-api-key";
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGINS") || "http://localhost:8080,https://xinxmjswzapwzbzhlbyo.lovableproject.com").split(",");
 
-if (!RESEND_API_KEY) {
-  console.error("RESEND_API_KEY is not set");
-}
+console.log("Email function initialized with RESEND_API_KEY:", RESEND_API_KEY ? "✓ Set" : "✗ Missing");
 
 const resend = new Resend(RESEND_API_KEY);
 
@@ -26,14 +23,6 @@ const corsHeaders = {
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
-};
-
-const isValidVendorId = (vendorId: string): boolean => {
-  return /^[A-Z0-9]{6,12}$/.test(vendorId);
-};
-
-const isValidAdminId = (adminId: string): boolean => {
-  return /^ADM[A-Z0-9]{7}$/.test(adminId);
 };
 
 const VALID_ACTIONS = [
@@ -58,7 +47,7 @@ interface EmailRequest {
 }
 
 const generateEmailContent = (req: EmailRequest) => {
-  const { email, vendorId, adminId, section, action, notes, siteName = 'Vendor Management Portal', siteUrl = SITE_URL, resetToken } = req;
+  const { email, vendorId, adminId, section, action, notes, siteName = 'Vendor Management Portal', siteUrl = SITE_URL } = req;
   
   const sanitizedNotes = notes ? sanitizeHtml(notes, {
     allowedTags: [],
@@ -78,31 +67,71 @@ const generateEmailContent = (req: EmailRequest) => {
   let content = '';
 
   switch (action) {
-    case 'signup':
     case 'admin-signup':
-      subject = section === 'admin' ? 'Admin Account Created Successfully' : 'Vendor Account Created Successfully';
+      subject = 'Admin Account Created Successfully';
       content = `
-        <h1>Welcome to ${siteName}!</h1>
-        <p>Your ${section} account has been created successfully.</p>
-        <p><strong>${idDisplay}</strong></p>
-        <p>You can now access your dashboard and complete your profile.</p>
-        <div style="margin: 20px 0;">
-          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Complete Your Profile</a>
+        <div style="background-color: #28a745; color: white; padding: 20px; text-align: center; margin-bottom: 20px;">
+          <h1 style="margin: 0; color: white;">Admin Account Created Successfully!</h1>
+        </div>
+        <div style="background-color: #d4edda; padding: 20px; margin: 20px 0; border-radius: 5px;">
+          <h3 style="color: #155724; margin-top: 0;">Account Details:</h3>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Admin ID:</strong> ${adminId}</p>
+          <p><strong>Account Created:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+        <p>Your admin account has been created successfully.</p>
+        <p>You can now access your admin dashboard to manage vendors and system settings.</p>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Access Admin Dashboard</a>
         </div>
         <p>If you have any questions, please don't hesitate to contact our support team.</p>
       `;
       break;
 
-    case 'signin':
-    case 'admin-signin':
-      subject = section === 'admin' ? 'Admin Portal Login Confirmation' : `Vendor Portal Login Confirmation`;
+    case 'signup':
+      subject = 'Vendor Account Created Successfully';
       content = `
-        <h1>${section === 'admin' ? 'Admin' : 'Vendor'} Portal Login Confirmation</h1>
-        <p>You have successfully signed in to your ${section} portal.</p>
-        <p><strong>${idDisplay}</strong></p>
-        <p>Login Time: ${new Date().toLocaleString()}</p>
-        <div style="margin: 20px 0;">
-          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Access Your Dashboard</a>
+        <div style="background-color: #28a745; color: white; padding: 20px; text-align: center; margin-bottom: 20px;">
+          <h1 style="margin: 0; color: white;">Vendor Account Created Successfully!</h1>
+        </div>
+        <div style="background-color: #d4edda; padding: 20px; margin: 20px 0; border-radius: 5px;">
+          <h3 style="color: #155724; margin-top: 0;">Account Details:</h3>
+          <p><strong>Email:</strong> ${email}</p>
+          <p><strong>Vendor ID:</strong> ${vendorId}</p>
+          <p><strong>Account Created:</strong> ${new Date().toLocaleString()}</p>
+        </div>
+        <p>Your vendor account has been created successfully.</p>
+        <p>You can now access your vendor portal to complete your profile, upload documents, and manage your vendor information.</p>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Complete Your Profile</a>
+        </div>
+        <p>If you have any questions, please don't hesitate to contact our support team.</p>
+      `;
+      break;
+
+    case 'admin-signin':
+      subject = 'Admin Portal Login Confirmation';
+      content = `
+        <h1>Admin Portal Login Confirmation</h1>
+        <p>You have successfully signed in to your admin portal.</p>
+        <p><strong>Admin ID: ${adminId}</strong></p>
+        <p><strong>Login Time:</strong> ${new Date().toLocaleString()}</p>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Access Your Dashboard</a>
+        </div>
+        <p>If this wasn't you, please contact our support team immediately.</p>
+      `;
+      break;
+
+    case 'signin':
+      subject = 'Vendor Portal Login Confirmation';
+      content = `
+        <h1>Vendor Portal Login Confirmation</h1>
+        <p>You have successfully signed in to your vendor portal.</p>
+        <p><strong>Vendor ID: ${vendorId}</strong></p>
+        <p><strong>Login Time:</strong> ${new Date().toLocaleString()}</p>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Access Your Dashboard</a>
         </div>
         <p>If this wasn't you, please contact our support team immediately.</p>
       `;
@@ -115,8 +144,8 @@ const generateEmailContent = (req: EmailRequest) => {
         <p>Thank you for submitting your vendor registration.</p>
         <p><strong>Vendor ID: ${vendorId}</strong></p>
         <p>Your application is currently under review. You will receive an email notification once the review is complete.</p>
-        <div style="margin: 20px 0;">
-          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Profile</a>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">View Your Profile</a>
         </div>
         <p>Review typically takes 2-3 business days.</p>
       `;
@@ -130,8 +159,8 @@ const generateEmailContent = (req: EmailRequest) => {
         <p><strong>Vendor ID: ${vendorId}</strong></p>
         <p>You can now access all vendor portal features and begin conducting business with us.</p>
         ${sanitizedNotes ? `<p><strong>Administrator Notes:</strong> ${sanitizedNotes}</p>` : ''}
-        <div style="margin: 20px 0;">
-          <a href="${profileUrl}" style="background-color: #28a745; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Access Vendor Portal</a>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${profileUrl}" style="background-color: #28a745; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Access Vendor Portal</a>
         </div>
       `;
       break;
@@ -145,8 +174,8 @@ const generateEmailContent = (req: EmailRequest) => {
         <p>Unfortunately, we are unable to approve your application at this time.</p>
         ${sanitizedNotes ? `<p><strong>Reason:</strong> ${sanitizedNotes}</p>` : ''}
         <p>You may resubmit your application after addressing the mentioned concerns.</p>
-        <div style="margin: 20px 0;">
-          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Update Your Profile</a>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Update Your Profile</a>
         </div>
       `;
       break;
@@ -159,7 +188,7 @@ const generateEmailContent = (req: EmailRequest) => {
         <p><strong>Vendor ID: ${vendorId}</strong></p>
         ${sanitizedNotes ? `<p><strong>Reason:</strong> ${sanitizedNotes}</p>` : ''}
         <p>Please contact our support team for more information about reactivating your account.</p>
-        <p>Email: support@${siteName.toLowerCase().replace(/\s+/g, '')}.com</p>
+        <p>Email: support@vendormanagementportal.com</p>
       `;
       break;
 
@@ -171,7 +200,7 @@ const generateEmailContent = (req: EmailRequest) => {
         <p><strong>Former Vendor ID: ${vendorId}</strong></p>
         ${sanitizedNotes ? `<p><strong>Administrator Notes:</strong> ${sanitizedNotes}</p>` : ''}
         <p>All associated data has been removed. If you believe this was done in error, please contact our support team.</p>
-        <p>Email: support@${siteName.toLowerCase().replace(/\s+/g, '')}.com</p>
+        <p>Email: support@vendormanagementportal.com</p>
       `;
       break;
 
@@ -183,8 +212,8 @@ const generateEmailContent = (req: EmailRequest) => {
         <p>You requested a password reset for your ${section} account.</p>
         <p><strong>${idDisplay}</strong></p>
         <p>Click the button below to reset your password.</p>
-        <div style="margin: 20px 0;">
-          <a href="${resetUrl}" style="background-color: #dc3545; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">Reset Password</a>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${resetUrl}" style="background-color: #dc3545; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">Reset Password</a>
         </div>
         <p>If you didn't request this password reset, please ignore this email.</p>
       `;
@@ -196,10 +225,10 @@ const generateEmailContent = (req: EmailRequest) => {
         <h1>Profile Updated</h1>
         <p>Your ${section} profile has been updated successfully.</p>
         <p><strong>${idDisplay}</strong></p>
-        <p>Update Time: ${new Date().toLocaleString()}</p>
+        <p><strong>Update Time:</strong> ${new Date().toLocaleString()}</p>
         ${sanitizedNotes ? `<p><strong>Changes:</strong> ${sanitizedNotes}</p>` : ''}
-        <div style="margin: 20px 0;">
-          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">View Your Profile</a>
+        <div style="margin: 20px 0; text-align: center;">
+          <a href="${profileUrl}" style="background-color: #007bff; color: white; padding: 12px 25px; text-decoration: none; border-radius: 5px; display: inline-block;">View Your Profile</a>
         </div>
       `;
       break;
@@ -212,7 +241,7 @@ const generateEmailContent = (req: EmailRequest) => {
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  console.log(`Received ${req.method} request`);
+  console.log(`📧 Received ${req.method} request to send-confirmation-email`);
   
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -228,18 +257,14 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    // API Key authentication
-    const apiKey = req.headers.get("x-api-key") || req.headers.get("authorization")?.replace("Bearer ", "");
-    if (!apiKey || apiKey !== API_KEY) {
-      console.error("Invalid or missing API key");
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json", ...corsHeaders },
-      });
-    }
-
     const requestBody: EmailRequest = await req.json();
-    console.log('Processing email request for:', requestBody.email, 'action:', requestBody.action);
+    console.log('📧 Processing email request:', {
+      email: requestBody.email,
+      action: requestBody.action,
+      section: requestBody.section,
+      vendorId: requestBody.vendorId,
+      adminId: requestBody.adminId
+    });
 
     // Input validation
     if (!requestBody.email || !isValidEmail(requestBody.email)) {
@@ -256,7 +281,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     const { subject, content } = generateEmailContent(requestBody);
 
-    console.log(`Sending email with subject: ${subject}`);
+    console.log(`📧 Sending email with subject: ${subject} to ${requestBody.email}`);
 
     const emailResponse = await resend.emails.send({
       from: `Vendor Portal <${FROM_EMAIL}>`,
@@ -270,23 +295,25 @@ const handler = async (req: Request): Promise<Response> => {
           <meta name="viewport" content="width=device-width, initial-scale=1.0">
           <title>${subject}</title>
         </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-          ${content}
-          <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
-          <p style="font-size: 12px; color: #666; text-align: center;">
-            This is an automated email from ${requestBody.siteName || 'Vendor Management Portal'}. Please do not reply to this email.
-          </p>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa;">
+          <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+            ${content}
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;">
+            <p style="font-size: 12px; color: #666; text-align: center; margin: 0;">
+              This is an automated email from ${requestBody.siteName || 'Vendor Management Portal'}. Please do not reply to this email.
+            </p>
+          </div>
         </body>
         </html>
       `,
     });
 
     if (emailResponse.error) {
-      console.error("Resend API error:", JSON.stringify(emailResponse.error, null, 2));
-      throw new Error(`Email sending failed: ${emailResponse.error}`);
+      console.error("❌ Resend API error:", JSON.stringify(emailResponse.error, null, 2));
+      throw new Error(`Email sending failed: ${JSON.stringify(emailResponse.error)}`);
     }
 
-    console.log("Email sent successfully:", emailResponse);
+    console.log("✅ Email sent successfully:", emailResponse.data);
 
     return new Response(JSON.stringify({ 
       success: true, 
@@ -298,11 +325,11 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
   } catch (error: any) {
-    console.error("Error in send-confirmation-email function:", error);
+    console.error("❌ Error in send-confirmation-email function:", error);
     
     return new Response(JSON.stringify({ 
       error: "Internal server error",
-      details: Deno.env.get("DEBUG") === "true" ? error.message : undefined
+      details: error.message
     }), {
       status: 500,
       headers: { "Content-Type": "application/json", ...corsHeaders },

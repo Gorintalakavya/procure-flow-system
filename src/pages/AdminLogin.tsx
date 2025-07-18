@@ -43,23 +43,21 @@ const AdminLogin = () => {
     return result;
   };
 
-  const sendAdminConfirmationEmail = async (email: string, adminId: string, action: string, password?: string) => {
+  const sendAdminConfirmationEmail = async (email: string, adminId: string, action: string) => {
     try {
-      console.log('📧 Sending admin confirmation email...');
+      console.log('📧 Sending admin confirmation email for action:', action);
       
-      const response = await fetch('/api/send-confirmation-email', {
+      const response = await fetch('https://xinxmjswzapwzbzhlbyo.supabase.co/functions/v1/send-confirmation-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': 'default-api-key'
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpbnhtanN3emFwd3piemhsYnlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ0NTQsImV4cCI6MjA2NjQxMDQ1NH0.Z3gyf7O3CSrNirIUn1sW_3H6hExr5BQPtQEML9j01JI`
         },
         body: JSON.stringify({
           email,
           adminId,
           section: 'admin',
           action,
-          password,
-          isNewAccount: !!password,
           siteName: 'Vendor Management Portal',
           siteUrl: window.location.origin
         })
@@ -68,7 +66,6 @@ const AdminLogin = () => {
       if (!response.ok) {
         const errorText = await response.text();
         console.error('❌ Error sending admin confirmation email:', errorText);
-        toast.error('Failed to send confirmation email');
         return false;
       } else {
         const result = await response.json();
@@ -77,7 +74,6 @@ const AdminLogin = () => {
       }
     } catch (error) {
       console.error('❌ Error invoking admin email function:', error);
-      toast.error('Failed to send confirmation email');
       return false;
     }
   };
@@ -108,13 +104,11 @@ const AdminLogin = () => {
         .single();
 
       const adminProfileData = profileData || { admin_id: 'N/A' };
-      const resetToken = Math.random().toString(36).substring(2, 15);
 
       const emailSent = await sendAdminConfirmationEmail(
         adminData.email, 
         adminProfileData.admin_id, 
-        'forgot-password',
-        undefined
+        'forgot-password'
       );
       
       if (emailSent) {
@@ -174,6 +168,7 @@ const AdminLogin = () => {
 
       console.log('✅ Admin login successful. Admin ID:', adminProfileData.admin_id);
 
+      // Send confirmation email for signin
       const emailSent = await sendAdminConfirmationEmail(adminData.email, adminProfileData.admin_id, 'admin-signin');
       
       if (emailSent) {
@@ -184,7 +179,7 @@ const AdminLogin = () => {
 
       setTimeout(() => {
         navigate('/admin-dashboard');
-      }, 1000);
+      }, 1500);
 
     } catch (error) {
       console.error('❌ Admin login error:', error);
@@ -266,17 +261,18 @@ const AdminLogin = () => {
 
       console.log('✅ Admin account created successfully');
 
+      // Send confirmation email for signup
       const emailSent = await sendAdminConfirmationEmail(newAdmin.email, adminId, 'admin-signup');
       
       if (emailSent) {
-        toast.success('Admin account created successfully! Confirmation email sent to your email address.');
+        toast.success('Admin account created successfully! Confirmation email sent. Redirecting to dashboard...');
       } else {
-        toast.success('Admin account created successfully!');
+        toast.success('Admin account created successfully! Redirecting to dashboard...');
       }
 
       setTimeout(() => {
         navigate('/admin-dashboard');
-      }, 1500);
+      }, 2000);
 
     } catch (error) {
       console.error('❌ Error creating admin:', error);

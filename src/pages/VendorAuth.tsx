@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,11 +25,11 @@ const VendorAuth = () => {
     try {
       console.log('🚀 Sending confirmation email for', action, 'to', email);
       
-      const response = await fetch('/api/send-confirmation-email', {
+      const response = await fetch('https://xinxmjswzapwzbzhlbyo.supabase.co/functions/v1/send-confirmation-email', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': 'default-api-key'
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InhpbnhtanN3emFwd3piemhsYnlvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA4MzQ0NTQsImV4cCI6MjA2NjQxMDQ1NH0.Z3gyf7O3CSrNirIUn1sW_3H6hExr5BQPtQEML9j01JI`
         },
         body: JSON.stringify({
           email,
@@ -125,6 +126,7 @@ const VendorAuth = () => {
 
       console.log('✅ Vendor login successful');
 
+      // Send confirmation email for signin
       const emailSent = await sendConfirmationEmail(userData.email, userData.vendor_id || 'N/A', 'signin');
       
       if (emailSent) {
@@ -135,7 +137,7 @@ const VendorAuth = () => {
 
       setTimeout(() => {
         navigate('/vendor-profile');
-      }, 1000);
+      }, 1500);
 
     } catch (error) {
       console.error('❌ Vendor login error:', error);
