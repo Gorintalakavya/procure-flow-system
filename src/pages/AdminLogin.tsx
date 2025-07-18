@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Shield, Mail, Lock, User, ArrowLeft, Eye, EyeOff, UserCheck } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -23,7 +24,8 @@ const AdminLogin = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: ''
   });
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
 
@@ -202,6 +204,11 @@ const AdminLogin = () => {
       return;
     }
 
+    if (!signupData.role) {
+      toast.error('Please select a role');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -227,7 +234,7 @@ const AdminLogin = () => {
           name: signupData.name,
           email: signupData.email,
           password_hash: signupData.password,
-          role: 'admin',
+          role: signupData.role,
           is_active: true
         })
         .select()
@@ -285,6 +292,7 @@ const AdminLogin = () => {
   if (showForgotPassword) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+        
         <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center py-4">
@@ -363,6 +371,7 @@ const AdminLogin = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+      
       <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -494,6 +503,26 @@ const AdminLogin = () => {
                           className="pl-10"
                           required
                         />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="signup-role">Role</Label>
+                      <div className="relative">
+                        <UserCheck className="absolute left-3 top-3 h-4 w-4 text-gray-400 z-10" />
+                        <Select value={signupData.role} onValueChange={(value) => setSignupData(prev => ({ ...prev, role: value }))}>
+                          <SelectTrigger className="pl-10">
+                            <SelectValue placeholder="Select your role" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="procurement-officer">Procurement Officer</SelectItem>
+                            <SelectItem value="finance-team">Finance Team</SelectItem>
+                            <SelectItem value="compliance-officer">Compliance Officer</SelectItem>
+                            <SelectItem value="manager">Manager</SelectItem>
+                            <SelectItem value="supervisor">Supervisor</SelectItem>
+                          </SelectContent>
+                        </Select>
                       </div>
                     </div>
 

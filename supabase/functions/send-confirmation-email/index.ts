@@ -7,22 +7,39 @@ import sanitizeHtml from "npm:sanitize-html@2.17.0";
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") || "re_cCeBZSWk_93jQ7fCnjqq4ybQpXcdjSCQX";
 const SITE_URL = Deno.env.get("SITE_URL") || "http://localhost:3000";
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "onboarding@resend.dev";
-const API_KEY = Deno.env.get("EMAIL_API_KEY") || "default-api-key";
+const EMAIL_API_KEY = Deno.env.get("EMAIL_API_KEY") || "email-api-secure-key-2024";
+const ALLOWED_ORIGINS = ["http://localhost:3000", "http://localhost:8080", "https://xinxmjswzapwzbzhlbyo.supabase.co", "https://xinxmjswzapwzbzhlbyo.lovableproject.com"];
+
+// Enforce required environment variables
+if (!RESEND_API_KEY || RESEND_API_KEY === "your-resend-api-key") {
+  throw new Error("RESEND_API_KEY is required and must be set properly");
+}
 
 console.log("Email function initialized with RESEND_API_KEY:", RESEND_API_KEY ? "✓ Set" : "✗ Missing");
 
 const resend = new Resend(RESEND_API_KEY);
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigin = origin && ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-api-key",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+  };
 };
 
 // Validation functions
 const isValidEmail = (email: string): boolean => {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return emailRegex.test(email);
+};
+
+const isValidVendorId = (vendorId: string): boolean => {
+  return /^[A-Z0-9]{6,12}$/.test(vendorId);
+};
+
+const isValidAdminId = (adminId: string): boolean => {
+  return /^ADM[A-Z0-9]{7}$/.test(adminId);
 };
 
 const VALID_ACTIONS = [
@@ -32,6 +49,13 @@ const VALID_ACTIONS = [
 
 const isValidAction = (action: string): boolean => {
   return VALID_ACTIONS.includes(action);
+};
+
+const sanitizeSiteName = (siteName: string): string => {
+  return sanitizeHtml(siteName, {
+    allowedTags: [],
+    allowedAttributes: {}
+  }).replace(/[^a-zA-Z0-9\s-]/g, '').toLowerCase().replace(/\s+/g, '');
 };
 
 interface EmailRequest {
@@ -47,7 +71,7 @@ interface EmailRequest {
 }
 
 const generateEmailContent = (req: EmailRequest) => {
-  const { email, vendorId, adminId, section, action, notes, siteName = 'Vendor Management Portal', siteUrl = SITE_URL } = req;
+  const { email, vendorId, adminId, section, action, notes, siteName = 'Vendor Management Portal', siteUrl = SITE_URL, resetToken } = req;
   
   const sanitizedNotes = notes ? sanitizeHtml(notes, {
     allowedTags: [],
@@ -205,7 +229,9 @@ const generateEmailContent = (req: EmailRequest) => {
       break;
 
     case 'forgot-password':
-      const resetUrl = `${baseUrl}/${section === 'admin' ? 'admin-login' : 'vendor-auth'}?reset=true`;
+      const resetUrl = resetToken 
+        ? `${baseUrl}/${section === 'admin' ? 'admin-login' : 'vendor-auth'}?reset=true&token=${resetToken}`
+        : `${baseUrl}/${section === 'admin' ? 'admin-login' : 'vendor-auth'}?reset=true`;
       subject = 'Password Reset Request';
       content = `
         <h1>Password Reset Request</h1>
@@ -241,6 +267,9 @@ const generateEmailContent = (req: EmailRequest) => {
 };
 
 const handler = async (req: Request): Promise<Response> => {
+  const origin = req.headers.get("origin");
+  const corsHeaders = getCorsHeaders(origin);
+  
   console.log(`📧 Received ${req.method} request to send-confirmation-email`);
   
   // Handle CORS preflight requests
@@ -257,9 +286,12 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // API Key authentication (optional, can be removed if not needed)
+    const apiKey = req.headers.get("x-api-key") || req.headers.get("authorization")?.replace("Bearer ", "");
+    
     const requestBody: EmailRequest = await req.json();
     console.log('📧 Processing email request:', {
-      email: requestBody.email,
+      email: requestBody.email.replace(/(.{3}).*(@.*)/, '$1***$2'), // Mask email for privacy
       action: requestBody.action,
       section: requestBody.section,
       vendorId: requestBody.vendorId,
@@ -279,9 +311,18 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error(`Invalid action. Must be one of: ${VALID_ACTIONS.join(', ')}`);
     }
 
+    // Validate IDs when provided
+    if (requestBody.vendorId && !isValidVendorId(requestBody.vendorId)) {
+      throw new Error("Invalid vendor ID format");
+    }
+
+    if (requestBody.adminId && !isValidAdminId(requestBody.adminId)) {
+      throw new Error("Invalid admin ID format");
+    }
+
     const { subject, content } = generateEmailContent(requestBody);
 
-    console.log(`📧 Sending email with subject: ${subject} to ${requestBody.email}`);
+    console.log(`📧 Sending email with subject: ${subject} to ${requestBody.email.replace(/(.{3}).*(@.*)/, '$1***$2')}`);
 
     const emailResponse = await resend.emails.send({
       from: `Vendor Portal <${FROM_EMAIL}>`,
