@@ -5,47 +5,40 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Download, MapPin, Building2, Star, Eye } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Search, Building2, MapPin, Calendar, Globe, Phone, Mail, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Vendor {
   vendor_id: string;
   legal_entity_name: string;
+  trade_name?: string;
   email: string;
+  phone_number?: string;
+  website?: string;
+  business_description?: string;
+  vendor_type: string;
   city: string;
   state: string;
-  vendor_type: string;
+  country: string;
+  created_at: string;
+  year_established?: string;
+  employee_count?: string;
+  annual_revenue?: string;
   registration_status: string;
-  business_description?: string;
-  website?: string;
+  products_services_description?: string;
 }
-
-const US_STATES = [
-  'Alabama', 'Alaska', 'Arizona', 'Arkansas', 'California', 'Colorado', 'Connecticut', 'Delaware',
-  'Florida', 'Georgia', 'Hawaii', 'Idaho', 'Illinois', 'Indiana', 'Iowa', 'Kansas', 'Kentucky',
-  'Louisiana', 'Maine', 'Maryland', 'Massachusetts', 'Michigan', 'Minnesota', 'Mississippi',
-  'Missouri', 'Montana', 'Nebraska', 'Nevada', 'New Hampshire', 'New Jersey', 'New Mexico',
-  'New York', 'North Carolina', 'North Dakota', 'Ohio', 'Oklahoma', 'Oregon', 'Pennsylvania',
-  'Rhode Island', 'South Carolina', 'South Dakota', 'Tennessee', 'Texas', 'Utah', 'Vermont',
-  'Virginia', 'Washington', 'West Virginia', 'Wisconsin', 'Wyoming'
-];
-
-const US_INDUSTRIES = [
-  'Technology Services', 'Software Development', 'Manufacturing', 'Healthcare Services',
-  'Financial Services', 'Real Estate', 'Construction', 'Professional Services', 'Retail Trade',
-  'Transportation & Logistics', 'Energy & Utilities', 'Education Services', 'Food & Beverage',
-  'Automotive', 'Telecommunications', 'Media & Entertainment', 'Pharmaceuticals',
-  'Banking & Insurance', 'Consulting Services', 'Legal Services'
-];
 
 const VendorDirectory = () => {
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedIndustry, setSelectedIndustry] = useState('all');
-  const [selectedLocation, setSelectedLocation] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
+  const [locationFilter, setLocationFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   useEffect(() => {
     fetchVendors();
@@ -53,18 +46,25 @@ const VendorDirectory = () => {
 
   useEffect(() => {
     filterVendors();
-  }, [vendors, searchTerm, selectedIndustry, selectedLocation]);
+  }, [vendors, searchTerm, typeFilter, locationFilter]);
 
   const fetchVendors = async () => {
     try {
+      // Only fetch approved vendors for public directory
       const { data, error } = await supabase
         .from('vendors')
         .select('*')
         .eq('registration_status', 'approved')
-        .order('legal_entity_name');
+        .order('legal_entity_name', { ascending: true });
 
       if (error) throw error;
-      setVendors(data || []);
+      
+      // Remove duplicates based on vendor_id
+      const uniqueVendors = data?.filter((vendor, index, self) => 
+        index === self.findIndex(v => v.vendor_id === vendor.vendor_id)
+      ) || [];
+      
+      setVendors(uniqueVendors);
     } catch (error) {
       console.error('Error fetching vendors:', error);
       toast.error('Failed to fetch vendor directory');
@@ -79,51 +79,41 @@ const VendorDirectory = () => {
     if (searchTerm) {
       filtered = filtered.filter(vendor =>
         vendor.legal_entity_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vendor.trade_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         vendor.business_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.vendor_id.toLowerCase().includes(searchTerm.toLowerCase())
+        vendor.products_services_description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vendor.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vendor.state.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
 
-    if (selectedIndustry !== 'all') {
-      filtered = filtered.filter(vendor => vendor.vendor_type === selectedIndustry);
+    if (typeFilter !== 'all') {
+      filtered = filtered.filter(vendor => vendor.vendor_type === typeFilter);
     }
 
-    if (selectedLocation !== 'all') {
-      filtered = filtered.filter(vendor => vendor.state === selectedLocation);
+    if (locationFilter !== 'all') {
+      filtered = filtered.filter(vendor => 
+        vendor.state.toLowerCase() === locationFilter.toLowerCase() ||
+        vendor.country.toLowerCase() === locationFilter.toLowerCase()
+      );
     }
 
     setFilteredVendors(filtered);
   };
 
-  const exportDirectory = () => {
-    const csvContent = [
-      ['Company Name', 'Vendor ID', 'Location', 'Industry', 'Email', 'Website'],
-      ...filteredVendors.map(vendor => [
-        vendor.legal_entity_name,
-        vendor.vendor_id,
-        `${vendor.city}, ${vendor.state}`,
-        vendor.vendor_type,
-        vendor.email,
-        vendor.website || ''
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'vendor_directory.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const getUniqueStates = () => {
+    const states = vendors.map(v => v.state).filter(Boolean);
+    return [...new Set(states)].sort();
   };
 
-  const getProfileScore = (vendor: Vendor) => {
-    let score = 0;
-    if (vendor.business_description) score += 25;
-    if (vendor.website) score += 25;
-    if (vendor.email) score += 25;
-    score += 25; // Base score for approved status
-    return score;
+  const getUniqueTypes = () => {
+    const types = vendors.map(v => v.vendor_type).filter(Boolean);
+    return [...new Set(types)].sort();
+  };
+
+  const handleViewDetails = (vendor: Vendor) => {
+    setSelectedVendor(vendor);
+    setShowDetailsModal(true);
   };
 
   if (isLoading) {
@@ -136,51 +126,47 @@ const VendorDirectory = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">Vendor Directory</h2>
-          <p className="text-gray-600">Browse our verified vendor network</p>
-        </div>
-        <Button onClick={exportDirectory} className="flex items-center gap-2">
-          <Download className="h-4 w-4" />
-          Export Directory
-        </Button>
+      <div className="text-center">
+        <h2 className="text-3xl font-bold mb-2">Vendor Directory</h2>
+        <p className="text-gray-600">Browse our network of approved vendors</p>
       </div>
 
-      {/* Search and Filters */}
+      {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search companies, services, or descriptions..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Search vendors..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <Select value={selectedIndustry} onValueChange={setSelectedIndustry}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Industries" />
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Industries</SelectItem>
-                {US_INDUSTRIES.map(industry => (
-                  <SelectItem key={industry} value={industry}>{industry}</SelectItem>
+                <SelectItem value="all">All Types</SelectItem>
+                {getUniqueTypes().map(type => (
+                  <SelectItem key={type} value={type} className="capitalize">
+                    {type}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <Select value={selectedLocation} onValueChange={setSelectedLocation}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="All Locations" />
+            <Select value={locationFilter} onValueChange={setLocationFilter}>
+              <SelectTrigger>
+                <SelectValue placeholder="Filter by location" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Locations</SelectItem>
-                {US_STATES.map(state => (
-                  <SelectItem key={state} value={state}>{state}</SelectItem>
+                {getUniqueStates().map(state => (
+                  <SelectItem key={state} value={state}>
+                    {state}
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -188,67 +174,177 @@ const VendorDirectory = () => {
         </CardContent>
       </Card>
 
+      {/* Results Count */}
+      <div className="text-sm text-gray-600">
+        Showing {filteredVendors.length} vendor{filteredVendors.length !== 1 ? 's' : ''}
+      </div>
+
       {/* Vendor Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredVendors.map((vendor) => {
-          const profileScore = getProfileScore(vendor);
-          return (
+      {filteredVendors.length === 0 ? (
+        <Card>
+          <CardContent className="text-center py-12">
+            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No vendors found</h3>
+            <p className="text-gray-600">Try adjusting your search criteria</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredVendors.map((vendor) => (
             <Card key={vendor.vendor_id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <Building2 className="h-8 w-8 text-blue-600" />
-                  <div className="flex items-center gap-1">
-                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                    <span className="text-sm font-medium">{profileScore}%</span>
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-blue-600" />
+                    <Badge variant="outline" className="capitalize">
+                      {vendor.vendor_type}
+                    </Badge>
                   </div>
                 </div>
-                <div>
-                  <CardTitle className="text-lg">{vendor.legal_entity_name}</CardTitle>
-                  <p className="text-sm text-gray-600 font-mono">{vendor.vendor_id}</p>
-                </div>
+                <CardTitle className="line-clamp-2">
+                  {vendor.trade_name || vendor.legal_entity_name}
+                </CardTitle>
+                {vendor.trade_name && (
+                  <p className="text-sm text-gray-600">{vendor.legal_entity_name}</p>
+                )}
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent className="space-y-3">
                 <div className="flex items-center gap-2 text-sm text-gray-600">
                   <MapPin className="h-4 w-4" />
                   <span>{vendor.city}, {vendor.state}</span>
                 </div>
-                
-                <div>
-                  <Badge variant="outline" className="capitalize">
-                    {vendor.vendor_type}
-                  </Badge>
-                </div>
 
                 {vendor.business_description && (
-                  <p className="text-sm text-gray-700 line-clamp-2">
+                  <p className="text-sm text-gray-700 line-clamp-3">
                     {vendor.business_description}
                   </p>
                 )}
 
-                <div className="flex justify-between items-center pt-2">
-                  <div className="text-xs text-gray-500">
-                    Profile Score: {profileScore}%
+                <div className="flex items-center justify-between pt-2">
+                  <div className="flex items-center gap-4 text-xs text-gray-500">
+                    {vendor.year_established && (
+                      <div className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        <span>Est. {vendor.year_established}</span>
+                      </div>
+                    )}
                   </div>
-                  <Button variant="outline" size="sm" className="flex items-center gap-2">
-                    <Eye className="h-4 w-4" />
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleViewDetails(vendor)}
+                  >
                     View Details
                   </Button>
                 </div>
               </CardContent>
             </Card>
-          );
-        })}
-      </div>
-
-      {filteredVendors.length === 0 && (
-        <Card>
-          <CardContent className="text-center py-12">
-            <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium mb-2">No vendors found</h3>
-            <p className="text-gray-600">Try adjusting your search criteria or filters.</p>
-          </CardContent>
-        </Card>
+          ))}
+        </div>
       )}
+
+      {/* Vendor Details Modal */}
+      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Building2 className="h-5 w-5" />
+              {selectedVendor?.trade_name || selectedVendor?.legal_entity_name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          {selectedVendor && (
+            <div className="space-y-6">
+              {/* Basic Info */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-medium text-gray-900">Legal Entity Name</h4>
+                  <p className="text-gray-600">{selectedVendor.legal_entity_name}</p>
+                </div>
+                <div>
+                  <h4 className="font-medium text-gray-900">Vendor Type</h4>
+                  <Badge variant="outline" className="capitalize">
+                    {selectedVendor.vendor_type}
+                  </Badge>
+                </div>
+              </div>
+
+              {/* Contact Information */}
+              <div>
+                <h4 className="font-medium text-gray-900 mb-2">Contact Information</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <MapPin className="h-4 w-4 text-gray-400" />
+                    <span>{selectedVendor.city}, {selectedVendor.state}, {selectedVendor.country}</span>
+                  </div>
+                  {selectedVendor.email && (
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-400" />
+                      <a href={`mailto:${selectedVendor.email}`} className="text-blue-600 hover:underline">
+                        {selectedVendor.email}
+                      </a>
+                    </div>
+                  )}
+                  {selectedVendor.phone_number && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-gray-400" />
+                      <a href={`tel:${selectedVendor.phone_number}`} className="text-blue-600 hover:underline">
+                        {selectedVendor.phone_number}
+                      </a>
+                    </div>
+                  )}
+                  {selectedVendor.website && (
+                    <div className="flex items-center gap-2">
+                      <Globe className="h-4 w-4 text-gray-400" />
+                      <a 
+                        href={selectedVendor.website.startsWith('http') ? selectedVendor.website : `https://${selectedVendor.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline flex items-center gap-1"
+                      >
+                        {selectedVendor.website}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Business Description */}
+              {selectedVendor.business_description && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">About</h4>
+                  <p className="text-gray-600">{selectedVendor.business_description}</p>
+                </div>
+              )}
+
+              {/* Products/Services */}
+              {selectedVendor.products_services_description && (
+                <div>
+                  <h4 className="font-medium text-gray-900 mb-2">Products & Services</h4>
+                  <p className="text-gray-600">{selectedVendor.products_services_description}</p>
+                </div>
+              )}
+
+              {/* Company Details */}
+              <div className="grid grid-cols-2 gap-4">
+                {selectedVendor.year_established && (
+                  <div>
+                    <h4 className="font-medium text-gray-900">Year Established</h4>
+                    <p className="text-gray-600">{selectedVendor.year_established}</p>
+                  </div>
+                )}
+                {selectedVendor.employee_count && (
+                  <div>
+                    <h4 className="font-medium text-gray-900">Employee Count</h4>
+                    <p className="text-gray-600">{selectedVendor.employee_count}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

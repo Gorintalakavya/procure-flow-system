@@ -6,10 +6,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Search, Eye, Edit, Check, X, Mail, Download, FileText } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Search, Eye, Edit, Check, X, Mail, Download, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import VendorDetailsModal from "./VendorDetailsModal";
@@ -50,6 +51,8 @@ const AdminVendorManagement = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null);
 
   useEffect(() => {
     fetchVendors();
@@ -104,6 +107,7 @@ const AdminVendorManagement = () => {
 
       if (error) throw error;
 
+      // Log the action
       await supabase
         .from('audit_logs')
         .insert({
@@ -118,18 +122,34 @@ const AdminVendorManagement = () => {
 
       const vendor = vendors.find(v => v.vendor_id === vendorId);
       if (vendor) {
-        await supabase.functions.invoke('send-confirmation-email', {
-          body: {
-            email: vendor.email,
-            vendorId: vendorId,
-            section: 'vendor',
-            action: newStatus === 'approved' ? 'approval' : 'rejection',
-            notes: notes
+        console.log('Sending confirmation email to:', vendor.email);
+        
+        try {
+          const { data: emailData, error: emailError } = await supabase.functions.invoke('send-confirmation-email', {
+            body: {
+              email: vendor.email,
+              vendorId: vendorId,
+              section: 'vendor',
+              action: newStatus === 'approved' ? 'approval' : newStatus === 'rejected' ? 'rejection' : 'suspension',
+              notes: notes || '',
+              siteName: 'Vendor Management Portal',
+              siteUrl: window.location.origin
+            }
+          });
+
+          if (emailError) {
+            console.error('Email sending error:', emailError);
+            toast.error(`Vendor status updated to ${newStatus}, but email failed to send: ${emailError.message}`);
+          } else {
+            console.log('Email sent successfully:', emailData);
+            toast.success(`Vendor status updated to ${newStatus}. Confirmation email sent successfully.`);
           }
-        });
+        } catch (emailErr) {
+          console.error('Email function error:', emailErr);
+          toast.error(`Vendor status updated to ${newStatus}, but email sending failed.`);
+        }
       }
 
-      toast.success(`Vendor status updated to ${newStatus}. Confirmation email sent.`);
       fetchVendors();
       setSelectedVendor(null);
       setReviewNotes('');
@@ -137,6 +157,84 @@ const AdminVendorManagement = () => {
     } catch (error) {
       console.error('Error updating vendor status:', error);
       toast.error('Failed to update vendor status');
+    }
+  };
+
+  const deleteVendor = async (vendorId: string) => {
+    try {
+      // First, get vendor details for email notification
+      const vendor = vendors.find(v => v.vendor_id === vendorId);
+      
+      // Delete from related tables first (to maintain referential integrity)
+      const tablesToClean = [
+        'vendor_documents',
+        'verification_documents', 
+        'vendor_profiles',
+        'user_roles',
+        'notifications',
+        'audit_logs'
+      ];
+
+      for (const table of tablesToClean) {
+        await supabase
+          .from(table)
+          .delete()
+          .eq('vendor_id', vendorId);
+      }
+
+      // Delete users associated with this vendor
+      await supabase
+        .from('users')
+        .delete()
+        .eq('vendor_id', vendorId);
+
+      // Finally delete the vendor
+      const { error } = await supabase
+        .from('vendors')
+        .delete()
+        .eq('vendor_id', vendorId);
+
+      if (error) throw error;
+
+      // Send deletion notification email
+      if (vendor) {
+        try {
+          await supabase.functions.invoke('send-confirmation-email', {
+            body: {
+              email: vendor.email,
+              vendorId: vendorId,
+              section: 'vendor',
+              action: 'deletion',
+              notes: 'Your vendor account has been permanently deleted by an administrator.',
+              siteName: 'Vendor Management Portal',
+              siteUrl: window.location.origin
+            }
+          });
+        } catch (emailError) {
+          console.error('Failed to send deletion notification:', emailError);
+        }
+      }
+
+      // Log the deletion
+      await supabase
+        .from('audit_logs')
+        .insert({
+          vendor_id: vendorId,
+          action: 'VENDOR_DELETION',
+          entity_type: 'vendor',
+          entity_id: vendorId,
+          new_values: { status: 'deleted' },
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        });
+
+      toast.success('Vendor deleted successfully');
+      fetchVendors();
+      setShowDeleteDialog(false);
+      setVendorToDelete(null);
+    } catch (error) {
+      console.error('Error deleting vendor:', error);
+      toast.error('Failed to delete vendor');
     }
   };
 
@@ -171,13 +269,13 @@ const AdminVendorManagement = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="secondary">Pending Review</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending Review</Badge>;
       case 'approved':
         return <Badge variant="default" className="bg-green-100 text-green-800">Approved</Badge>;
       case 'rejected':
         return <Badge variant="destructive">Rejected</Badge>;
       case 'suspended':
-        return <Badge variant="destructive">Suspended</Badge>;
+        return <Badge variant="destructive" className="bg-orange-100 text-orange-800">Suspended</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
@@ -195,6 +293,11 @@ const AdminVendorManagement = () => {
   const handleReviewVendor = (vendor: Vendor) => {
     setSelectedVendor(vendor);
     setShowReviewDialog(true);
+  };
+
+  const handleDeleteVendor = (vendor: Vendor) => {
+    setVendorToDelete(vendor);
+    setShowDeleteDialog(true);
   };
 
   if (isLoading) {
@@ -289,7 +392,7 @@ const AdminVendorManagement = () => {
                         variant="outline"
                         size="sm"
                         onClick={() => handleEditVendor(vendor)}
-                        title="Edit Vendor"
+                        title="Edit Vendor Profile"
                       >
                         <Edit className="h-4 w-4" />
                       </Button>
@@ -300,6 +403,14 @@ const AdminVendorManagement = () => {
                         title="Review Status"
                       >
                         Review
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        onClick={() => handleDeleteVendor(vendor)}
+                        title="Delete Vendor"
+                      >
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </TableCell>
@@ -381,6 +492,35 @@ const AdminVendorManagement = () => {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete vendor "{vendorToDelete?.legal_entity_name}"? 
+              This action will remove all vendor data including:
+              <ul className="list-disc list-inside mt-2 space-y-1">
+                <li>Vendor profile and registration details</li>
+                <li>All uploaded documents</li>
+                <li>User accounts and credentials</li>
+                <li>Audit logs and history</li>
+              </ul>
+              <strong className="text-red-600">This action cannot be undone.</strong>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => vendorToDelete && deleteVendor(vendorToDelete.vendor_id)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Delete Permanently
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
