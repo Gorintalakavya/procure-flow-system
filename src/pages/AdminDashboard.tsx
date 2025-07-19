@@ -18,8 +18,6 @@ interface DashboardStats {
   pendingReviews: number;
   approvedVendors: number;
   rejectedVendors: number;
-  totalAdmins: number;
-  activeAdmins: number;
 }
 
 const AdminDashboard = () => {
@@ -28,9 +26,7 @@ const AdminDashboard = () => {
     totalVendors: 0,
     pendingReviews: 0,
     approvedVendors: 0,
-    rejectedVendors: 0,
-    totalAdmins: 0,
-    activeAdmins: 0
+    rejectedVendors: 0
   });
   const [isLoading, setIsLoading] = useState(true);
 
@@ -40,21 +36,13 @@ const AdminDashboard = () => {
 
   const fetchDashboardStats = async () => {
     try {
-      // Fetch vendor stats
-      const { data: vendors, error: vendorError } = await supabase
+      const { data: vendors, error } = await supabase
         .from('vendors')
         .select('registration_status');
 
-      if (vendorError) throw vendorError;
+      if (error) throw error;
 
-      // Fetch admin stats
-      const { data: admins, error: adminError } = await supabase
-        .from('admin_users')
-        .select('is_active');
-
-      if (adminError) throw adminError;
-
-      const vendorStats = vendors.reduce((acc, vendor) => {
+      const stats = vendors.reduce((acc, vendor) => {
         acc.totalVendors++;
         switch (vendor.registration_status) {
           case 'pending':
@@ -75,18 +63,7 @@ const AdminDashboard = () => {
         rejectedVendors: 0
       });
 
-      const adminStats = admins.reduce((acc, admin) => {
-        acc.totalAdmins++;
-        if (admin.is_active) {
-          acc.activeAdmins++;
-        }
-        return acc;
-      }, {
-        totalAdmins: 0,
-        activeAdmins: 0
-      });
-
-      setStats({ ...vendorStats, ...adminStats });
+      setStats(stats);
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       toast.error('Failed to fetch dashboard statistics');
@@ -134,7 +111,7 @@ const AdminDashboard = () => {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Dashboard Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Vendors</CardTitle>
@@ -183,32 +160,6 @@ const AdminDashboard = () => {
               <div className="text-2xl font-bold text-red-600">{stats.rejectedVendors}</div>
               <p className="text-xs text-muted-foreground">
                 Applications declined
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Admins</CardTitle>
-              <Shield className="h-4 w-4 text-blue-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{stats.totalAdmins}</div>
-              <p className="text-xs text-muted-foreground">
-                System administrators
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Active Admins</CardTitle>
-              <Users className="h-4 w-4 text-green-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">{stats.activeAdmins}</div>
-              <p className="text-xs text-muted-foreground">
-                Currently active
               </p>
             </CardContent>
           </Card>

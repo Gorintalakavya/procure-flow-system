@@ -3,11 +3,11 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
-import { Search, Eye, Edit, Trash2, Shield, UserCheck, UserX } from "lucide-react";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Shield, Mail, User, Calendar, Edit, Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,159 +18,130 @@ interface AdminUser {
   role: string;
   is_active: boolean;
   created_at: string;
-  updated_at: string;
-  admin_profiles?: {
-    admin_id: string;
-  }[];
+  admin_id?: string;
 }
 
 const AdminManagement = () => {
   const [admins, setAdmins] = useState<AdminUser[]>([]);
-  const [filteredAdmins, setFilteredAdmins] = useState<AdminUser[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedAdmin, setSelectedAdmin] = useState<AdminUser | null>(null);
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [adminToDelete, setAdminToDelete] = useState<AdminUser | null>(null);
+  const [editingAdmin, setEditingAdmin] = useState<AdminUser | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    role: 'admin',
+    is_active: true
+  });
 
   useEffect(() => {
     fetchAdmins();
   }, []);
 
-  useEffect(() => {
-    filterAdmins();
-  }, [admins, searchTerm]);
-
   const fetchAdmins = async () => {
     try {
-      const { data, error } = await supabase
-        .from('admin_users')
-        .select(`
-          *,
-          admin_profiles(admin_id)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setAdmins(data || []);
-    } catch (error) {
-      console.error('Error fetching admins:', error);
-      toast.error('Failed to fetch admin users');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const filterAdmins = () => {
-    let filtered = admins;
-
-    if (searchTerm) {
-      filtered = filtered.filter(admin =>
-        admin.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        admin.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        admin.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (admin.admin_profiles?.[0]?.admin_id && 
-         admin.admin_profiles[0].admin_id.toLowerCase().includes(searchTerm.toLowerCase()))
-      );
-    }
-
-    setFilteredAdmins(filtered);
-  };
-
-  const handleViewAdmin = (admin: AdminUser) => {
-    setSelectedAdmin(admin);
-    setShowDetailsModal(true);
-  };
-
-  const handleDeleteAdmin = (admin: AdminUser) => {
-    setAdminToDelete(admin);
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDeleteAdmin = async () => {
-    if (!adminToDelete) return;
-
-    try {
       setIsLoading(true);
-
-      // Delete admin profile first
-      if (adminToDelete.admin_profiles?.[0]?.admin_id) {
-        const { error: profileError } = await supabase
-          .from('admin_profiles')
-          .delete()
-          .eq('admin_user_id', adminToDelete.id);
-
-        if (profileError) console.error('Error deleting admin profile:', profileError);
-      }
-
-      // Delete admin user
-      const { error: adminError } = await supabase
+      
+      const { data: adminUsers, error: adminError } = await supabase
         .from('admin_users')
-        .delete()
-        .eq('id', adminToDelete.id);
+        .select('*')
+        .order('created_at', { ascending: false });
 
       if (adminError) throw adminError;
 
-      // Log the deletion
-      await supabase
-        .from('audit_logs')
-        .insert({
-          action: 'ADMIN_DELETED',
-          entity_type: 'admin',
-          entity_id: adminToDelete.id,
-          new_values: { 
-            deleted_admin: adminToDelete.email,
-            deleted_by: 'admin',
-            reason: 'admin_deletion' 
-          },
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
+      const { data: adminProfiles, error: profileError } = await supabase
+        .from('admin_profiles')
+        .select('admin_id, admin_user_id');
 
-      toast.success('Admin deleted successfully');
-      fetchAdmins();
-      setShowDeleteDialog(false);
-      setAdminToDelete(null);
+      if (profileError) throw profileError;
+
+      const adminsWithProfiles = adminUsers.map(admin => {
+        const profile = adminProfiles.find(p => p.admin_user_id === admin.id);
+        return {
+          ...admin,
+          admin_id: profile?.admin_id || 'N/A'
+        };
+      });
+
+      setAdmins(adminsWithProfiles);
     } catch (error) {
-      console.error('Error deleting admin:', error);
-      toast.error('Failed to delete admin');
+      console.error('Error fetching admins:', error);
+      toast.error('Failed to fetch admin data');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const toggleAdminStatus = async (admin: AdminUser) => {
+  const handleEdit = (admin: AdminUser) => {
+    setEditingAdmin(admin);
+    setFormData({
+      name: admin.name || '',
+      email: admin.email,
+      role: admin.role,
+      is_active: admin.is_active
+    });
+    setIsDialogOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!editingAdmin) return;
+
     try {
-      const newStatus = !admin.is_active;
-      
       const { error } = await supabase
         .from('admin_users')
-        .update({ is_active: newStatus })
-        .eq('id', admin.id);
+        .update({
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          is_active: formData.is_active,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', editingAdmin.id);
 
       if (error) throw error;
 
-      toast.success(`Admin ${newStatus ? 'activated' : 'deactivated'} successfully`);
+      toast.success('Admin updated successfully');
+      setIsDialogOpen(false);
+      setEditingAdmin(null);
       fetchAdmins();
     } catch (error) {
-      console.error('Error updating admin status:', error);
-      toast.error('Failed to update admin status');
+      console.error('Error updating admin:', error);
+      toast.error('Failed to update admin');
     }
   };
 
-  const getStatusBadge = (isActive: boolean) => {
-    return isActive ? (
-      <Badge variant="default" className="bg-green-100 text-green-800">Active</Badge>
-    ) : (
-      <Badge variant="destructive">Inactive</Badge>
-    );
+  const handleDelete = async (adminId: string) => {
+    if (!confirm('Are you sure you want to delete this admin?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('admin_users')
+        .delete()
+        .eq('id', adminId);
+
+      if (error) throw error;
+
+      toast.success('Admin deleted successfully');
+      fetchAdmins();
+    } catch (error) {
+      console.error('Error deleting admin:', error);
+      toast.error('Failed to delete admin');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading admins...</div>
+      <div className="flex items-center justify-center p-8">
+        <div className="text-lg">Loading admin data...</div>
       </div>
     );
   }
@@ -178,32 +149,71 @@ const AdminManagement = () => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Admin Management</h2>
-        <div className="flex items-center gap-2 text-sm text-gray-600">
-          <Shield className="h-4 w-4" />
-          Total Admins: {filteredAdmins.length}
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Admin Management</h2>
+          <p className="text-gray-600">Manage administrator accounts and permissions</p>
         </div>
       </div>
 
-      {/* Search */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search by name, email, role, or admin ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
+      {/* Admin Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Admins</CardTitle>
+            <Shield className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{admins.length}</div>
+          </CardContent>
+        </Card>
 
-      {/* Admins Table */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Admins</CardTitle>
+            <User className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-green-600">
+              {admins.filter(admin => admin.is_active).length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Inactive Admins</CardTitle>
+            <User className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              {admins.filter(admin => !admin.is_active).length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Recent Additions</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {admins.filter(admin => {
+                const createdDate = new Date(admin.created_at);
+                const lastWeek = new Date();
+                lastWeek.setDate(lastWeek.getDate() - 7);
+                return createdDate > lastWeek;
+              }).length}
+            </div>
+            <p className="text-xs text-muted-foreground">Last 7 days</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Admin Table */}
       <Card>
         <CardHeader>
-          <CardTitle>System Administrators ({filteredAdmins.length})</CardTitle>
+          <CardTitle>Administrator Accounts</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -214,46 +224,49 @@ const AdminManagement = () => {
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead>Created Date</TableHead>
+                <TableHead>Created</TableHead>
                 <TableHead>Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAdmins.map((admin) => (
+              {admins.map((admin) => (
                 <TableRow key={admin.id}>
-                  <TableCell className="font-mono">
-                    {admin.admin_profiles?.[0]?.admin_id || 'N/A'}
-                  </TableCell>
-                  <TableCell className="font-medium">{admin.name}</TableCell>
-                  <TableCell>{admin.email}</TableCell>
-                  <TableCell className="capitalize">{admin.role}</TableCell>
-                  <TableCell>{getStatusBadge(admin.is_active)}</TableCell>
-                  <TableCell>{new Date(admin.created_at).toLocaleDateString()}</TableCell>
+                  <TableCell className="font-medium">{admin.admin_id}</TableCell>
+                  <TableCell>{admin.name || 'N/A'}</TableCell>
                   <TableCell>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 text-gray-400" />
+                      {admin.email}
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className="capitalize">
+                      {admin.role}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge 
+                      variant={admin.is_active ? "default" : "secondary"}
+                      className={admin.is_active ? "bg-green-100 text-green-800" : ""}
+                    >
+                      {admin.is_active ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>{formatDate(admin.created_at)}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => handleViewAdmin(admin)}
-                        title="View Details"
+                        onClick={() => handleEdit(admin)}
                       >
-                        <Eye className="h-4 w-4" />
+                        <Edit className="h-4 w-4" />
                       </Button>
                       <Button
-                        variant="outline"
+                        variant="ghost"
                         size="sm"
-                        onClick={() => toggleAdminStatus(admin)}
-                        title={admin.is_active ? "Deactivate Admin" : "Activate Admin"}
-                        className={admin.is_active ? "text-orange-600 hover:text-orange-700" : "text-green-600 hover:text-green-700"}
-                      >
-                        {admin.is_active ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleDeleteAdmin(admin)}
-                        title="Delete Admin"
-                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        onClick={() => handleDelete(admin.id)}
+                        className="text-red-600 hover:text-red-800"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -263,91 +276,80 @@ const AdminManagement = () => {
               ))}
             </TableBody>
           </Table>
+
+          {admins.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No administrators found</p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Admin Details Modal */}
-      <Dialog open={showDetailsModal} onOpenChange={setShowDetailsModal}>
-        <DialogContent className="max-w-md">
+      {/* Edit Admin Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent>
           <DialogHeader>
-            <DialogTitle>Admin Details</DialogTitle>
+            <DialogTitle>Edit Administrator</DialogTitle>
+            <DialogDescription>
+              Update administrator account details and permissions.
+            </DialogDescription>
           </DialogHeader>
-          {selectedAdmin && (
-            <div className="space-y-4">
-              <div>
-                <Label>Admin ID</Label>
-                <p className="font-mono text-sm">
-                  {selectedAdmin.admin_profiles?.[0]?.admin_id || 'Not assigned'}
-                </p>
-              </div>
-              <div>
-                <Label>Full Name</Label>
-                <p className="text-sm">{selectedAdmin.name}</p>
-              </div>
-              <div>
-                <Label>Email Address</Label>
-                <p className="text-sm">{selectedAdmin.email}</p>
-              </div>
-              <div>
-                <Label>Role</Label>
-                <p className="text-sm capitalize">{selectedAdmin.role}</p>
-              </div>
-              <div>
-                <Label>Status</Label>
-                <div className="mt-1">{getStatusBadge(selectedAdmin.is_active)}</div>
-              </div>
-              <div>
-                <Label>Account Created</Label>
-                <p className="text-sm">{new Date(selectedAdmin.created_at).toLocaleString()}</p>
-              </div>
-              <div>
-                <Label>Last Updated</Label>
-                <p className="text-sm">{new Date(selectedAdmin.updated_at).toLocaleString()}</p>
-              </div>
+          
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="edit-name">Full Name</Label>
+              <Input
+                id="edit-name"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                placeholder="Enter full name"
+              />
             </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-red-600">Delete Admin</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              Are you sure you want to permanently delete admin <strong>{adminToDelete?.name}</strong>? 
-              This action cannot be undone and will remove all admin privileges and access.
-            </p>
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-800">
-                <strong>Warning:</strong> This will permanently delete:
-              </p>
-              <ul className="text-sm text-red-700 mt-2 list-disc list-inside">
-                <li>Admin account and credentials</li>
-                <li>All admin privileges and access rights</li>
-                <li>Admin profile and associated data</li>
-              </ul>
+            
+            <div className="grid gap-2">
+              <Label htmlFor="edit-email">Email</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                placeholder="Enter email address"
+              />
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                className="flex-1"
-                onClick={() => setShowDeleteDialog(false)}
+            
+            <div className="grid gap-2">
+              <Label htmlFor="edit-role">Role</Label>
+              <select
+                id="edit-role"
+                value={formData.role}
+                onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                className="w-full p-2 border border-gray-300 rounded-md"
               >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={confirmDeleteAdmin}
-                disabled={isLoading}
-              >
-                {isLoading ? 'Deleting...' : 'Delete Permanently'}
-              </Button>
+                <option value="admin">Admin</option>
+                <option value="super_admin">Super Admin</option>
+                <option value="moderator">Moderator</option>
+              </select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="edit-active"
+                checked={formData.is_active}
+                onChange={(e) => setFormData(prev => ({ ...prev, is_active: e.target.checked }))}
+              />
+              <Label htmlFor="edit-active">Active Account</Label>
             </div>
           </div>
+          
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSave}>
+              Save Changes
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
