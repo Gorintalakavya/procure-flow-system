@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Search, Eye, Edit, Check, X, Mail, Download, FileText } from "lucide-react";
+import { Search, Eye, Edit, Check, X, Mail, Download, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import VendorDetailsModal from "./VendorDetailsModal";
@@ -50,6 +49,8 @@ const AdminVendorManagement = () => {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [vendorToDelete, setVendorToDelete] = useState<Vendor | null>(null);
 
   useEffect(() => {
     fetchVendors();
@@ -93,6 +94,56 @@ const AdminVendorManagement = () => {
     }
 
     setFilteredVendors(filtered);
+  };
+
+  const handleDeleteVendor = async (vendor: Vendor) => {
+    setVendorToDelete(vendor);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDeleteVendor = async () => {
+    if (!vendorToDelete) return;
+
+    try {
+      setIsLoading(true);
+
+      // Delete vendor from database
+      const { error: vendorError } = await supabase
+        .from('vendors')
+        .delete()
+        .eq('vendor_id', vendorToDelete.vendor_id);
+
+      if (vendorError) throw vendorError;
+
+      // Delete related user account if exists
+      const { error: userError } = await supabase
+        .from('users')
+        .delete()
+        .eq('vendor_id', vendorToDelete.vendor_id);
+
+      // Log the deletion
+      await supabase
+        .from('audit_logs')
+        .insert({
+          vendor_id: vendorToDelete.vendor_id,
+          action: 'VENDOR_DELETED',
+          entity_type: 'vendor',
+          entity_id: vendorToDelete.vendor_id,
+          new_values: { deleted_by: 'admin', reason: 'admin_deletion' },
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        });
+
+      toast.success('Vendor deleted successfully');
+      fetchVendors(); // Refresh the list
+      setShowDeleteDialog(false);
+      setVendorToDelete(null);
+    } catch (error) {
+      console.error('Error deleting vendor:', error);
+      toast.error('Failed to delete vendor');
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const updateVendorStatus = async (vendorId: string, newStatus: string, notes?: string) => {
@@ -301,6 +352,15 @@ const AdminVendorManagement = () => {
                       >
                         Review
                       </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDeleteVendor(vendor)}
+                        title="Delete Vendor"
+                        className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -378,6 +438,48 @@ const AdminVendorManagement = () => {
             >
               Suspend
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">Delete Vendor</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              Are you sure you want to permanently delete <strong>{vendorToDelete?.legal_entity_name}</strong>? 
+              This action cannot be undone and will remove all vendor data and credentials from the system.
+            </p>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
+              <p className="text-sm text-red-800">
+                <strong>Warning:</strong> This will permanently delete:
+              </p>
+              <ul className="text-sm text-red-700 mt-2 list-disc list-inside">
+                <li>Vendor profile and business information</li>
+                <li>Associated user credentials</li>
+                <li>All related documents and data</li>
+              </ul>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowDeleteDialog(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                className="flex-1"
+                onClick={confirmDeleteVendor}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Deleting...' : 'Delete Permanently'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

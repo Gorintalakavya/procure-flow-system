@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, Mail, Lock, User, ArrowLeft } from "lucide-react";
+import { Shield, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +13,10 @@ import { supabase } from "@/integrations/supabase/client";
 const AdminLogin = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -81,6 +84,45 @@ const AdminLogin = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotPasswordEmail) {
+      toast.error('Please enter your email address');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Check if admin exists
+      const { data: adminData } = await supabase
+        .from('admin_users')
+        .select('email')
+        .eq('email', forgotPasswordEmail.toLowerCase().trim())
+        .maybeSingle();
+
+      if (!adminData) {
+        toast.error('No admin account found with this email');
+        return;
+      }
+
+      // Send password reset email
+      const { error } = await supabase.auth.resetPasswordForEmail(forgotPasswordEmail, {
+        redirectTo: `${window.location.origin}/admin-login`
+      });
+
+      if (error) throw error;
+
+      toast.success('Password reset email sent! Check your inbox.');
+      setShowForgotPassword(false);
+      setForgotPasswordEmail('');
+    } catch (error) {
+      console.error('Error sending reset email:', error);
+      toast.error('Failed to send password reset email');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -113,7 +155,7 @@ const AdminLogin = () => {
 
       // Simple password comparison (in production, use proper hashing)
       if (adminData.password_hash !== loginData.password) {
-        console.error('❌ Invalid password for admin:', loginData.email);
+        console.error('❌ Invalid password for admin:', adminData.email);
         toast.error('Invalid email or password');
         return;
       }
@@ -250,6 +292,85 @@ const AdminLogin = () => {
     }
   };
 
+  if (showForgotPassword) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100">
+        <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="flex justify-between items-center py-4">
+              <div className="flex items-center space-x-4">
+                <Button
+                  variant="ghost"
+                  onClick={() => navigate('/')}
+                  className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+                >
+                  <ArrowLeft className="h-4 w-4" />
+                  Back to Home
+                </Button>
+                <div className="flex items-center space-x-3">
+                  <Shield className="h-8 w-8 text-red-600" />
+                  <div>
+                    <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
+                    <p className="text-sm text-slate-600">Reset your password</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-center py-8">
+          <div className="max-w-md w-full mx-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-center">Reset Password</CardTitle>
+                <CardDescription className="text-center">
+                  Enter your email address and we'll send you a link to reset your password
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleForgotPassword} className="space-y-4">
+                  <div>
+                    <Label htmlFor="forgot-email">Email Address</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                      <Input
+                        id="forgot-email"
+                        type="email"
+                        value={forgotPasswordEmail}
+                        onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                        placeholder="Enter your admin email"
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? 'Sending...' : 'Send Reset Link'}
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="w-full"
+                    onClick={() => setShowForgotPassword(false)}
+                  >
+                    Back to Login
+                  </Button>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100">
       {/* Sticky Header */}
@@ -317,13 +438,20 @@ const AdminLogin = () => {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="admin-signin-password"
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           value={loginData.password}
                           onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
                           placeholder="Enter your password"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           required
                         />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
@@ -333,6 +461,15 @@ const AdminLogin = () => {
                       disabled={isLoading}
                     >
                       {isLoading ? 'Signing In...' : 'Sign In'}
+                    </Button>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="w-full text-sm"
+                      onClick={() => setShowForgotPassword(true)}
+                    >
+                      Forgot your password?
                     </Button>
                   </form>
                 </TabsContent>
@@ -392,14 +529,21 @@ const AdminLogin = () => {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="admin-signup-password"
-                          type="password"
+                          type={showPassword ? "text" : "password"}
                           value={signupData.password}
                           onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
                           placeholder="Create a password (min 6 characters)"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           required
                           minLength={6}
                         />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
@@ -409,14 +553,21 @@ const AdminLogin = () => {
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
                           id="admin-signup-confirm-password"
-                          type="password"
+                          type={showConfirmPassword ? "text" : "password"}
                           value={signupData.confirmPassword}
                           onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                           placeholder="Confirm your password"
-                          className="pl-10"
+                          className="pl-10 pr-10"
                           required
                           minLength={6}
                         />
+                        <button
+                          type="button"
+                          className="absolute right-3 top-3 h-4 w-4 text-gray-400 hover:text-gray-600"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
                       </div>
                     </div>
 
