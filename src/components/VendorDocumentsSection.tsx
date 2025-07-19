@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, X, Upload, Save } from "lucide-react";
+import { Check, X, Upload, Save, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -49,6 +49,11 @@ interface VerificationDocs {
   articles_of_incorporation?: string;
   business_licenses?: string;
   w9_form?: string;
+  w9_ein?: string;
+  irs_tax_compliance_cert?: string;
+  sec_filings?: string;
+  osha_epa_labor_compliance?: string;
+  fcpa_hipaa_compliance?: string;
 }
 
 const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
@@ -94,6 +99,22 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
     }
   };
 
+  const handleDocumentDelete = async (field: keyof VerificationDocs) => {
+    try {
+      const updatedDocs = {
+        ...verificationDocs,
+        [field]: null
+      };
+
+      setVerificationDocs(updatedDocs);
+      setHasChanges(true);
+      toast.success('Document removed');
+    } catch (error) {
+      console.error('Error removing document:', error);
+      toast.error('Failed to remove document');
+    }
+  };
+
   const handleSaveDocuments = async () => {
     setIsLoading(true);
     try {
@@ -116,6 +137,18 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
     }
   };
 
+  const documentFields = [
+    { key: 'ein_verification_letter', label: 'EIN Verification Letter (Form SS-4)' },
+    { key: 'articles_of_incorporation', label: 'Articles of Incorporation' },
+    { key: 'business_licenses', label: 'Business Licenses or State Registration' },
+    { key: 'w9_form', label: 'W-9 Form Upload' },
+    { key: 'w9_ein', label: 'W-9 / EIN' },
+    { key: 'irs_tax_compliance_cert', label: 'IRS Tax Compliance Cert.' },
+    { key: 'sec_filings', label: 'SEC Filings (if public)' },
+    { key: 'osha_epa_labor_compliance', label: 'OSHA / EPA / Labor Compliance' },
+    { key: 'fcpa_hipaa_compliance', label: 'FCPA / HIPAA Compliance' }
+  ];
+
   return (
     <Card>
       <CardHeader>
@@ -137,18 +170,30 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
       </CardHeader>
       <CardContent className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-4">
-            <div className="border rounded-lg p-4">
+          {documentFields.map((field) => (
+            <div key={field.key} className="border rounded-lg p-4">
               <div className="flex justify-between items-center mb-2">
-                <Label>EIN Verification Letter (Form SS-4)</Label>
-                {verificationDocs.ein_verification_letter ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <X className="h-4 w-4 text-gray-400" />
-                )}
+                <Label>{field.label}</Label>
+                <div className="flex items-center gap-2">
+                  {verificationDocs[field.key as keyof VerificationDocs] ? (
+                    <Check className="h-4 w-4 text-green-600" />
+                  ) : (
+                    <X className="h-4 w-4 text-gray-400" />
+                  )}
+                  {verificationDocs[field.key as keyof VerificationDocs] && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDocumentDelete(field.key as keyof VerificationDocs)}
+                      className="text-red-600 hover:text-red-700 p-1"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
               </div>
-              {verificationDocs.ein_verification_letter ? (
-                <p className="text-sm text-gray-600 mb-2">{verificationDocs.ein_verification_letter}</p>
+              {verificationDocs[field.key as keyof VerificationDocs] ? (
+                <p className="text-sm text-gray-600 mb-2">{verificationDocs[field.key as keyof VerificationDocs]}</p>
               ) : (
                 <p className="text-sm text-gray-500 mb-2">No document uploaded</p>
               )}
@@ -156,90 +201,13 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
                 type="file"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-                  if (file) handleDocumentUpload('ein_verification_letter', file);
+                  if (file) handleDocumentUpload(field.key as keyof VerificationDocs, file);
                 }}
                 accept=".pdf,.jpg,.jpeg,.png"
               />
               <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG accepted</p>
             </div>
-
-            <div className="border rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
-                <Label>Articles of Incorporation</Label>
-                {verificationDocs.articles_of_incorporation ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <X className="h-4 w-4 text-gray-400" />
-                )}
-              </div>
-              {verificationDocs.articles_of_incorporation ? (
-                <p className="text-sm text-gray-600 mb-2">{verificationDocs.articles_of_incorporation}</p>
-              ) : (
-                <p className="text-sm text-gray-500 mb-2">No document uploaded</p>
-              )}
-              <Input
-                type="file"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleDocumentUpload('articles_of_incorporation', file);
-                }}
-                accept=".pdf,.jpg,.jpeg,.png"
-              />
-              <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG accepted</p>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="border rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
-                <Label>Business Licenses or State Registration</Label>
-                {verificationDocs.business_licenses ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <X className="h-4 w-4 text-gray-400" />
-                )}
-              </div>
-              {verificationDocs.business_licenses ? (
-                <p className="text-sm text-gray-600 mb-2">{verificationDocs.business_licenses}</p>
-              ) : (
-                <p className="text-sm text-gray-500 mb-2">No document uploaded</p>
-              )}
-              <Input
-                type="file"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleDocumentUpload('business_licenses', file);
-                }}
-                accept=".pdf,.jpg,.jpeg,.png"
-              />
-              <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG accepted</p>
-            </div>
-
-            <div className="border rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
-                <Label>W-9 Form Upload</Label>
-                {verificationDocs.w9_form ? (
-                  <Check className="h-4 w-4 text-green-600" />
-                ) : (
-                  <X className="h-4 w-4 text-gray-400" />
-                )}
-              </div>
-              {verificationDocs.w9_form ? (
-                <p className="text-sm text-gray-600 mb-2">{verificationDocs.w9_form}</p>
-              ) : (
-                <p className="text-sm text-gray-500 mb-2">No document uploaded</p>
-              )}
-              <Input
-                type="file"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleDocumentUpload('w9_form', file);
-                }}
-                accept=".pdf,.jpg,.jpeg,.png"
-              />
-              <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG accepted</p>
-            </div>
-          </div>
+          ))}
         </div>
 
         <div className="bg-blue-50 p-4 rounded-lg">

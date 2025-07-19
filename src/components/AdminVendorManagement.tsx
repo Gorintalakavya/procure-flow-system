@@ -7,9 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Search, Eye, Edit, Check, X, Mail, Download, FileText } from "lucide-react";
+import { Search, Eye, Edit, Check, X, Mail, Download, FileText, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import VendorDetailsModal from "./VendorDetailsModal";
@@ -137,6 +138,42 @@ const AdminVendorManagement = () => {
     } catch (error) {
       console.error('Error updating vendor status:', error);
       toast.error('Failed to update vendor status');
+    }
+  };
+
+  const deleteVendor = async (vendorId: string) => {
+    try {
+      // Delete from all related tables
+      await supabase.from('verification_documents').delete().eq('vendor_id', vendorId);
+      await supabase.from('vendor_profiles').delete().eq('vendor_id', vendorId);
+      await supabase.from('documents').delete().eq('vendor_id', vendorId);
+      await supabase.from('users').delete().eq('vendor_id', vendorId);
+      
+      // Finally delete the vendor
+      const { error } = await supabase
+        .from('vendors')
+        .delete()
+        .eq('vendor_id', vendorId);
+
+      if (error) throw error;
+
+      // Log the deletion
+      await supabase
+        .from('audit_logs')
+        .insert({
+          vendor_id: vendorId,
+          action: 'DELETE',
+          entity_type: 'vendor',
+          entity_id: vendorId,
+          ip_address: '127.0.0.1',
+          user_agent: navigator.userAgent
+        });
+
+      toast.success('Vendor and all related data deleted successfully');
+      fetchVendors();
+    } catch (error) {
+      console.error('Error deleting vendor:', error);
+      toast.error('Failed to delete vendor');
     }
   };
 
@@ -301,6 +338,35 @@ const AdminVendorManagement = () => {
                       >
                         Review
                       </Button>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            title="Delete Vendor"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete {vendor.legal_entity_name}? This action cannot be undone and will permanently remove all vendor data including credentials and documents.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => deleteVendor(vendor.vendor_id)}
+                              className="bg-red-600 hover:bg-red-700"
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </TableCell>
                 </TableRow>
