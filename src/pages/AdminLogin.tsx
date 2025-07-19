@@ -4,8 +4,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Shield, Mail, Lock, User, ArrowLeft, Eye, EyeOff } from "lucide-react";
+import { Shield, Mail, Lock, User, ArrowLeft } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,8 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 const AdminLogin = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loginData, setLoginData] = useState({
     email: '',
     password: ''
@@ -23,7 +22,8 @@ const AdminLogin = () => {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    role: ''
   });
 
   const generateUniqueAdminId = () => {
@@ -42,34 +42,42 @@ const AdminLogin = () => {
     return result;
   };
 
-  const sendAdminConfirmationEmail = async (email: string, adminId: string, action: string, password?: string) => {
+  const sendAdminConfirmationEmail = async (email: string, action: string, adminId?: string) => {
     try {
       console.log('📧 Sending admin confirmation email...');
-      
-      const { error } = await supabase.functions.invoke('send-confirmation-email', {
+      const response = await supabase.functions.invoke('send-confirmation-email', {
         body: {
           email,
-          adminId,
+          vendorId: adminId || '',
           section: 'admin',
-          action,
-          password,
-          isNewAccount: !!password,
-          apiKey: 'default-key'
+          action
         }
       });
 
-      if (error) {
-        console.error('❌ Error sending admin confirmation email:', error);
-        toast.error('Failed to send confirmation email');
-        return false;
+      if (response.error) {
+        console.error('❌ Error sending admin confirmation email:', response.error);
       } else {
         console.log('✅ Admin confirmation email sent successfully');
-        return true;
+        toast.success('Confirmation email sent!');
       }
     } catch (error) {
       console.error('❌ Error invoking admin email function:', error);
-      toast.error('Failed to send confirmation email');
-      return false;
+    }
+  };
+
+  const logAdminActivity = async (action: string, adminId: string, details: any = {}) => {
+    try {
+      await supabase
+        .from('audit_logs')
+        .insert({
+          action,
+          entity_type: 'admin_auth',
+          entity_id: adminId,
+          new_values: details,
+          timestamp: new Date().toISOString()
+        });
+    } catch (error) {
+      console.error('Error logging admin activity:', error);
     }
   };
 
@@ -79,51 +87,59 @@ const AdminLogin = () => {
 
     try {
       console.log('🔐 Admin sign in attempt:', loginData.email);
-
+      
+      // First check if admin exists and get their data
       const { data: adminData, error: adminError } = await supabase
         .from('admin_users')
-        .select('*')
+        .select(`
+          *,
+          admin_profiles!inner(admin_id)
+        `)
         .eq('email', loginData.email)
-        .eq('password_hash', loginData.password)
         .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
-      if (adminError || !adminData) {
+      if (adminError) {
+        console.error('❌ Database error:', adminError);
+        toast.error('Database error occurred');
+        return;
+      }
+
+      if (!adminData) {
+        console.error('❌ Admin not found with email:', loginData.email);
+        toast.error('Invalid email or password');
+        return;
+      }
+
+      // Simple password comparison (in production, use proper hashing)
+      if (adminData.password_hash !== loginData.password) {
         console.error('❌ Invalid password for admin:', loginData.email);
         toast.error('Invalid email or password');
         return;
       }
 
-      const { data: profileData } = await supabase
-        .from('admin_profiles')
-        .select('*')
-        .eq('admin_user_id', adminData.id)
-        .single();
+      const adminId = adminData.admin_profiles?.[0]?.admin_id || '';
+      console.log('✅ Admin login successful. Admin ID:', adminId);
 
-      const adminProfileData = profileData || { admin_id: 'N/A' };
-
-      localStorage.setItem('adminAuth', JSON.stringify({
+      // Store admin session data
+      localStorage.setItem('adminUser', JSON.stringify({
         id: adminData.id,
         email: adminData.email,
         name: adminData.name,
         role: adminData.role,
-        adminId: adminProfileData.admin_id,
+        adminId: adminId,
         isAuthenticated: true
       }));
 
-      console.log('✅ Admin login successful. Admin ID:', adminProfileData.admin_id);
+      // Log the sign-in activity
+      await logAdminActivity('admin_signin', adminId, {
+        email: adminData.email,
+        timestamp: new Date().toISOString()
+      });
 
-      const emailSent = await sendAdminConfirmationEmail(adminData.email, adminProfileData.admin_id, 'admin-signin');
-      
-      if (emailSent) {
-        toast.success('Login successful! Confirmation email sent. Redirecting to dashboard...');
-      } else {
-        toast.success('Login successful! Redirecting to dashboard...');
-      }
-
-      setTimeout(() => {
-        navigate('/admin-dashboard');
-      }, 1000);
+      await sendAdminConfirmationEmail(adminData.email, 'signin', adminId);
+      toast.success('Admin login successful!');
+      navigate('/admin-dashboard');
 
     } catch (error) {
       console.error('❌ Admin login error:', error);
@@ -146,55 +162,67 @@ const AdminLogin = () => {
       return;
     }
 
+    if (!signupData.role) {
+      toast.error('Please select a role');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
       console.log('📝 Admin signup attempt:', signupData.email);
 
+      // Check if admin already exists
       const { data: existingAdmin } = await supabase
         .from('admin_users')
         .select('email')
         .eq('email', signupData.email)
-        .single();
+        .maybeSingle();
 
       if (existingAdmin) {
         toast.error('Admin with this email already exists');
         return;
       }
 
+      // Generate unique admin ID
       const adminId = generateUniqueAdminId();
       console.log('🆔 Generated Admin ID:', adminId);
 
-      const { data: newAdmin, error: adminError } = await supabase
+      // Create admin user
+      const { data: newAdmin, error: createError } = await supabase
         .from('admin_users')
         .insert({
           name: signupData.name,
           email: signupData.email,
-          password_hash: signupData.password,
-          role: 'admin',
+          password_hash: signupData.password, // In production, hash this
+          role: signupData.role,
           is_active: true
         })
         .select()
         .single();
 
-      if (adminError) {
-        console.error('❌ Error creating admin:', adminError);
+      if (createError) {
+        console.error('❌ Error creating admin:', createError);
         toast.error('Failed to create admin account');
         return;
       }
 
+      // Create admin profile with generated ID
       const { error: profileError } = await supabase
         .from('admin_profiles')
         .insert({
-          admin_user_id: newAdmin.id,
-          admin_id: adminId
+          admin_id: adminId,
+          admin_user_id: newAdmin.id
         });
 
       if (profileError) {
         console.error('❌ Error creating admin profile:', profileError);
+        toast.error('Failed to create admin profile');
+        return;
       }
 
-      localStorage.setItem('adminAuth', JSON.stringify({
+      // Store admin session data
+      localStorage.setItem('adminUser', JSON.stringify({
         id: newAdmin.id,
         email: newAdmin.email,
         name: newAdmin.name,
@@ -203,19 +231,16 @@ const AdminLogin = () => {
         isAuthenticated: true
       }));
 
+      // Log the signup activity
+      await logAdminActivity('admin_signup', adminId, {
+        email: newAdmin.email,
+        timestamp: new Date().toISOString()
+      });
+
       console.log('✅ Admin account created successfully');
-
-      const emailSent = await sendAdminConfirmationEmail(newAdmin.email, adminId, 'admin-signup', signupData.password);
-      
-      if (emailSent) {
-        toast.success('Admin account created successfully! Confirmation email sent to your email address.');
-      } else {
-        toast.success('Admin account created successfully!');
-      }
-
-      setTimeout(() => {
-        navigate('/admin-dashboard');
-      }, 1500);
+      await sendAdminConfirmationEmail(newAdmin.email, 'signup', adminId);
+      toast.success('Admin account created successfully!');
+      navigate('/admin-dashboard');
 
     } catch (error) {
       console.error('❌ Error creating admin:', error);
@@ -226,7 +251,8 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-indigo-100">
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-100">
+      {/* Sticky Header */}
       <div className="sticky top-0 z-50 bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
@@ -240,10 +266,10 @@ const AdminLogin = () => {
                 Back to Home
               </Button>
               <div className="flex items-center space-x-3">
-                <Shield className="h-8 w-8 text-purple-600" />
+                <Shield className="h-8 w-8 text-red-600" />
                 <div>
                   <h1 className="text-2xl font-bold text-slate-900">Admin Portal</h1>
-                  <p className="text-sm text-slate-600">Secure administrator access</p>
+                  <p className="text-sm text-slate-600">Administrative access to procurement portal</p>
                 </div>
               </div>
             </div>
@@ -251,30 +277,30 @@ const AdminLogin = () => {
         </div>
       </div>
 
-      <div className="flex items-center justify-center py-12">
+      <div className="flex items-center justify-center py-8">
         <div className="max-w-md w-full mx-4">
           <Card>
             <CardHeader>
-              <CardTitle className="text-center">Administrator Authentication</CardTitle>
+              <CardTitle className="text-center">Admin Authentication</CardTitle>
               <CardDescription className="text-center">
-                Sign in to existing account or create new admin account
+                Sign in to your admin account or create a new one
               </CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="signin" className="w-full">
                 <TabsList className="grid w-full grid-cols-2">
                   <TabsTrigger value="signin">Sign In</TabsTrigger>
-                  <TabsTrigger value="signup">Create Account</TabsTrigger>
+                  <TabsTrigger value="signup">Sign Up</TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="signin">
                   <form onSubmit={handleSignIn} className="space-y-4">
                     <div>
-                      <Label htmlFor="signin-email">Email Address</Label>
+                      <Label htmlFor="admin-signin-email">Email Address</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
-                          id="signin-email"
+                          id="admin-signin-email"
                           type="email"
                           value={loginData.email}
                           onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
@@ -286,31 +312,24 @@ const AdminLogin = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="signin-password">Password</Label>
+                      <Label htmlFor="admin-signin-password">Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
-                          id="signin-password"
-                          type={showPassword ? "text" : "password"}
+                          id="admin-signin-password"
+                          type="password"
                           value={loginData.password}
                           onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
                           placeholder="Enter your password"
-                          className="pl-10 pr-10"
+                          className="pl-10"
                           required
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
                       </div>
                     </div>
 
                     <Button 
                       type="submit" 
-                      className="w-full bg-purple-600 hover:bg-purple-700"
+                      className="w-full"
                       disabled={isLoading}
                     >
                       {isLoading ? 'Signing In...' : 'Sign In'}
@@ -321,11 +340,11 @@ const AdminLogin = () => {
                 <TabsContent value="signup">
                   <form onSubmit={handleSignUp} className="space-y-4">
                     <div>
-                      <Label htmlFor="signup-name">Full Name</Label>
+                      <Label htmlFor="admin-signup-name">Full Name</Label>
                       <div className="relative">
                         <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
-                          id="signup-name"
+                          id="admin-signup-name"
                           type="text"
                           value={signupData.name}
                           onChange={(e) => setSignupData(prev => ({ ...prev, name: e.target.value }))}
@@ -337,11 +356,11 @@ const AdminLogin = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="signup-email">Email Address</Label>
+                      <Label htmlFor="admin-signup-email">Email Address</Label>
                       <div className="relative">
                         <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
-                          id="signup-email"
+                          id="admin-signup-email"
                           type="email"
                           value={signupData.email}
                           onChange={(e) => setSignupData(prev => ({ ...prev, email: e.target.value }))}
@@ -353,56 +372,57 @@ const AdminLogin = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="signup-password">Password</Label>
+                      <Label htmlFor="admin-signup-role">Role</Label>
+                      <Select value={signupData.role} onValueChange={(value) => setSignupData(prev => ({ ...prev, role: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select your role" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="Procurement Officer">Procurement Officer</SelectItem>
+                          <SelectItem value="Finance Team">Finance Team</SelectItem>
+                          <SelectItem value="Vendor">Vendor</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="admin-signup-password">Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
-                          id="signup-password"
-                          type={showPassword ? "text" : "password"}
+                          id="admin-signup-password"
+                          type="password"
                           value={signupData.password}
                           onChange={(e) => setSignupData(prev => ({ ...prev, password: e.target.value }))}
                           placeholder="Create a password (min 6 characters)"
-                          className="pl-10 pr-10"
+                          className="pl-10"
                           required
                           minLength={6}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                        >
-                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
                       </div>
                     </div>
 
                     <div>
-                      <Label htmlFor="signup-confirm-password">Confirm Password</Label>
+                      <Label htmlFor="admin-signup-confirm-password">Confirm Password</Label>
                       <div className="relative">
                         <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                         <Input
-                          id="signup-confirm-password"
-                          type={showConfirmPassword ? "text" : "password"}
+                          id="admin-signup-confirm-password"
+                          type="password"
                           value={signupData.confirmPassword}
                           onChange={(e) => setSignupData(prev => ({ ...prev, confirmPassword: e.target.value }))}
                           placeholder="Confirm your password"
-                          className="pl-10 pr-10"
+                          className="pl-10"
                           required
                           minLength={6}
                         />
-                        <button
-                          type="button"
-                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                          className="absolute right-3 top-3 text-gray-400 hover:text-gray-600"
-                        >
-                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                        </button>
                       </div>
                     </div>
 
                     <Button 
                       type="submit" 
-                      className="w-full bg-purple-600 hover:bg-purple-700"
+                      className="w-full"
                       disabled={isLoading}
                     >
                       {isLoading ? 'Creating Account...' : 'Create Admin Account'}

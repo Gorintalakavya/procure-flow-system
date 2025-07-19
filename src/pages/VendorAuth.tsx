@@ -50,8 +50,7 @@ const VendorAuth = () => {
           email,
           vendorId,
           section: 'vendor',
-          action,
-          apiKey: 'default-key'
+          action
         }
       });
 
