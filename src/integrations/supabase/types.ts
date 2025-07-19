@@ -948,29 +948,44 @@ export type Database = {
           account_number: string | null
           account_type: string | null
           assets: string | null
+          audit_reports_available: string | null
+          audit_result_summary: string | null
+          audit_type: string | null
           bank_address: string | null
           bank_name: string | null
           billing_address: string | null
           certifications: string | null
           company_description: string | null
           compliance_forms: string | null
+          compliance_officer: string | null
+          compliance_status: string | null
           contract_details: string | null
+          corrective_actions: string | null
           created_at: string | null
           currency: string | null
           date_of_incorporation: string | null
           esg_industry_average: string | null
           esg_ranking: string | null
+          external_auditing_firm: string | null
+          federal_regulations: string | null
           fiscal_year_end: string | null
           id: string
           industry: string | null
+          industry_regulations: string | null
           key_principal: string | null
           last_audit_date: string | null
+          last_compliance_review: string | null
+          last_external_audit: string | null
+          last_internal_audit: string | null
           net_income_growth: string | null
           next_audit_date: string | null
+          next_audit_due: string | null
+          next_compliance_review: string | null
           payment_terms: string | null
           primary_contact: string | null
           ranking: string | null
           reconciliation_account: string | null
+          regulatory_bodies: string | null
           regulatory_notes: string | null
           relationship_owner: string | null
           revenue: string | null
@@ -990,29 +1005,44 @@ export type Database = {
           account_number?: string | null
           account_type?: string | null
           assets?: string | null
+          audit_reports_available?: string | null
+          audit_result_summary?: string | null
+          audit_type?: string | null
           bank_address?: string | null
           bank_name?: string | null
           billing_address?: string | null
           certifications?: string | null
           company_description?: string | null
           compliance_forms?: string | null
+          compliance_officer?: string | null
+          compliance_status?: string | null
           contract_details?: string | null
+          corrective_actions?: string | null
           created_at?: string | null
           currency?: string | null
           date_of_incorporation?: string | null
           esg_industry_average?: string | null
           esg_ranking?: string | null
+          external_auditing_firm?: string | null
+          federal_regulations?: string | null
           fiscal_year_end?: string | null
           id?: string
           industry?: string | null
+          industry_regulations?: string | null
           key_principal?: string | null
           last_audit_date?: string | null
+          last_compliance_review?: string | null
+          last_external_audit?: string | null
+          last_internal_audit?: string | null
           net_income_growth?: string | null
           next_audit_date?: string | null
+          next_audit_due?: string | null
+          next_compliance_review?: string | null
           payment_terms?: string | null
           primary_contact?: string | null
           ranking?: string | null
           reconciliation_account?: string | null
+          regulatory_bodies?: string | null
           regulatory_notes?: string | null
           relationship_owner?: string | null
           revenue?: string | null
@@ -1032,29 +1062,44 @@ export type Database = {
           account_number?: string | null
           account_type?: string | null
           assets?: string | null
+          audit_reports_available?: string | null
+          audit_result_summary?: string | null
+          audit_type?: string | null
           bank_address?: string | null
           bank_name?: string | null
           billing_address?: string | null
           certifications?: string | null
           company_description?: string | null
           compliance_forms?: string | null
+          compliance_officer?: string | null
+          compliance_status?: string | null
           contract_details?: string | null
+          corrective_actions?: string | null
           created_at?: string | null
           currency?: string | null
           date_of_incorporation?: string | null
           esg_industry_average?: string | null
           esg_ranking?: string | null
+          external_auditing_firm?: string | null
+          federal_regulations?: string | null
           fiscal_year_end?: string | null
           id?: string
           industry?: string | null
+          industry_regulations?: string | null
           key_principal?: string | null
           last_audit_date?: string | null
+          last_compliance_review?: string | null
+          last_external_audit?: string | null
+          last_internal_audit?: string | null
           net_income_growth?: string | null
           next_audit_date?: string | null
+          next_audit_due?: string | null
+          next_compliance_review?: string | null
           payment_terms?: string | null
           primary_contact?: string | null
           ranking?: string | null
           reconciliation_account?: string | null
+          regulatory_bodies?: string | null
           regulatory_notes?: string | null
           relationship_owner?: string | null
           revenue?: string | null

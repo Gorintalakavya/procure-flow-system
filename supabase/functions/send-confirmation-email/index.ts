@@ -12,14 +12,11 @@ const corsHeaders = {
 
 interface EmailRequest {
   email: string;
+  vendorName?: string;
   vendorId?: string;
-  section?: string;
-  action?: string;
-  notes?: string;
-  credentials?: {
-    email: string;
-    password: string;
-  };
+  password?: string;
+  type?: 'confirmation' | 'password_reset';
+  isAdmin?: boolean;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -28,127 +25,88 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, vendorId, section, action, notes, credentials }: EmailRequest = await req.json();
+    const { email, vendorName, vendorId, password, type = 'confirmation', isAdmin = false }: EmailRequest = await req.json();
 
-    let subject = "";
-    let html = "";
+    let subject: string;
+    let html: string;
 
-    if (section === "vendor") {
-      if (action === "signup") {
-        subject = "Welcome to Vendor Portal - Complete Your Registration";
+    if (type === 'password_reset') {
+      if (isAdmin) {
+        subject = "Admin Password Reset Request";
         html = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #2563eb;">Welcome to Vendor Portal</h1>
-            <p>Thank you for registering with us. Your vendor account has been created successfully.</p>
-            
-            <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #1e40af;">Your Login Credentials:</h3>
-              <p><strong>Email:</strong> ${credentials?.email || email}</p>
-              <p><strong>Password:</strong> ${credentials?.password || 'Please use the password you set during registration'}</p>
-            </div>
-            
-            <p>Please log in to your vendor portal to complete your profile and upload required documents.</p>
-            
-            <div style="margin: 30px 0;">
-              <a href="${Deno.env.get('SUPABASE_URL')?.replace('https://', 'https://').replace('.supabase.co', '')}.lovableproject.com/vendor-auth" 
-                 style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Login to Vendor Portal
-              </a>
-            </div>
-            
-            <p>If you have any questions, please contact our support team.</p>
-            
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-            <p style="color: #6b7280; font-size: 14px;">
-              This is an automated message. Please do not reply to this email.
-            </p>
+            <h1 style="color: #2563eb;">Password Reset Request</h1>
+            <p>Dear Admin,</p>
+            <p>We received a request to reset your admin account password. If you made this request, please contact your system administrator to reset your password.</p>
+            <p>If you did not request this password reset, please ignore this email or contact support immediately.</p>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Vendor Management System</p>
+            <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
           </div>
         `;
-      } else if (action === "approval") {
-        subject = "Vendor Registration Approved";
+      } else {
+        subject = "Vendor Password Reset Request";
         html = `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #16a34a;">Vendor Registration Approved</h1>
-            <p>Congratulations! Your vendor registration has been approved.</p>
-            
-            <div style="background-color: #f0fdf4; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #15803d;">Status: APPROVED</h3>
-              <p><strong>Vendor ID:</strong> ${vendorId}</p>
-              ${notes ? `<p><strong>Admin Notes:</strong> ${notes}</p>` : ''}
+            <h1 style="color: #2563eb;">Password Reset Request</h1>
+            <p>Dear Vendor,</p>
+            <p>We received a request to reset your vendor account password. If you made this request, please contact support to reset your password.</p>
+            <p>If you did not request this password reset, please ignore this email or contact support immediately.</p>
+            <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 20px 0;">
+              <p><strong>Support Contact:</strong> support@innosoul.com</p>
             </div>
-            
-            <p>You can now access all vendor portal features and submit proposals.</p>
-            
-            <div style="margin: 30px 0;">
-              <a href="${Deno.env.get('SUPABASE_URL')?.replace('https://', 'https://').replace('.supabase.co', '')}.lovableproject.com/vendor-auth" 
-                 style="background-color: #16a34a; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Access Vendor Portal
-              </a>
-            </div>
-            
-            <p>Thank you for your business!</p>
-            
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-            <p style="color: #6b7280; font-size: 14px;">
-              This is an automated message. Please do not reply to this email.
-            </p>
-          </div>
-        `;
-      } else if (action === "rejection") {
-        subject = "Vendor Registration Status Update";
-        html = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #dc2626;">Vendor Registration Update</h1>
-            <p>We have reviewed your vendor registration application.</p>
-            
-            <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #dc2626;">Status: NEEDS ATTENTION</h3>
-              <p><strong>Vendor ID:</strong> ${vendorId}</p>
-              ${notes ? `<p><strong>Admin Notes:</strong> ${notes}</p>` : ''}
-            </div>
-            
-            <p>Please review the feedback and update your application accordingly.</p>
-            
-            <div style="margin: 30px 0;">
-              <a href="${Deno.env.get('SUPABASE_URL')?.replace('https://', 'https://').replace('.supabase.co', '')}.lovableproject.com/vendor-auth" 
-                 style="background-color: #dc2626; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                Update Application
-              </a>
-            </div>
-            
-            <p>If you have any questions, please contact our support team.</p>
-            
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-            <p style="color: #6b7280; font-size: 14px;">
-              This is an automated message. Please do not reply to this email.
-            </p>
+            <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+            <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Vendor Management System</p>
+            <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
           </div>
         `;
       }
-    } else if (section === "admin" && action === "password_reset") {
-      subject = "Admin Password Reset Request";
+    } else {
+      // Confirmation email
+      subject = "Welcome to Vendor Management System - Complete Your Profile";
       html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h1 style="color: #2563eb;">Password Reset Request</h1>
-          <p>We received a request to reset your admin password.</p>
+          <h1 style="color: #2563eb;">Welcome to Vendor Management System!</h1>
+          <p>Dear ${vendorName || 'Vendor'},</p>
+          <p>Thank you for registering with our Vendor Management System. Your vendor account has been created successfully.</p>
           
-          <div style="background-color: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <p>Please contact your system administrator to reset your password.</p>
+          <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #374151;">Your Login Credentials:</h3>
+            <p><strong>Vendor ID:</strong> ${vendorId}</p>
             <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Temporary Password:</strong> ${password}</p>
           </div>
           
-          <p>If you did not request this reset, please ignore this email.</p>
+          <div style="background-color: #fef3c7; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
+            <p style="margin: 0;"><strong>Important:</strong> Please change your password after your first login for security purposes.</p>
+          </div>
           
-          <hr style="margin: 30px 0; border: none; border-top: 1px solid #e5e7eb;">
-          <p style="color: #6b7280; font-size: 14px;">
-            This is an automated message. Please do not reply to this email.
-          </p>
+          <h3 style="color: #374151;">Next Steps:</h3>
+          <ol style="line-height: 1.6;">
+            <li>Log in to your vendor portal using the credentials above</li>
+            <li>Complete your vendor profile with all required information</li>
+            <li>Upload necessary verification documents</li>
+            <li>Review and submit your registration for approval</li>
+          </ol>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${Deno.env.get('SITE_URL') || 'https://vendor-management.com'}/vendor-auth" 
+               style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Access Vendor Portal
+            </a>
+          </div>
+          
+          <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+          
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+          <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Vendor Management Team<br>support@innosoul.com</p>
+          <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
         </div>
       `;
     }
 
     const emailResponse = await resend.emails.send({
-      from: "Vendor Portal <support@innosoul.com>",
+      from: "Vendor Management System <support@innosoul.com>",
       to: [email],
       subject: subject,
       html: html,

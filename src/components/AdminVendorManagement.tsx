@@ -4,61 +4,63 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Search, Eye, Edit, Check, X, Mail, Download, FileText, Trash2 } from "lucide-react";
+import { Search, Edit, Trash2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import VendorDetailsModal from "./VendorDetailsModal";
-import VendorProfileEditor from "./VendorProfileEditor";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { useNavigate } from "react-router-dom";
 
 interface Vendor {
   vendor_id: string;
   legal_entity_name: string;
   trade_name?: string;
   email: string;
-  registration_status: string;
+  phone_number?: string;
   vendor_type: string;
   city: string;
   state: string;
   country: string;
+  registration_status: string;
   created_at: string;
-  phone_number?: string;
-  website?: string;
-  business_description?: string;
-  year_established?: string;
-  employee_count?: string;
-  annual_revenue?: string;
-  operating_status?: string;
-  stock_symbol?: string;
-  duns_number?: string;
-  contact_name?: string;
-  street_address?: string;
 }
 
 const AdminVendorManagement = () => {
+  const navigate = useNavigate();
   const [vendors, setVendors] = useState<Vendor[]>([]);
   const [filteredVendors, setFilteredVendors] = useState<Vendor[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
-  const [reviewNotes, setReviewNotes] = useState('');
-  const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
-  const [showReviewDialog, setShowReviewDialog] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     fetchVendors();
   }, []);
 
   useEffect(() => {
-    filterVendors();
-  }, [vendors, searchTerm, statusFilter]);
+    if (searchTerm) {
+      const filtered = vendors.filter(vendor =>
+        vendor.legal_entity_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vendor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        vendor.vendor_id.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      setFilteredVendors(filtered);
+    } else {
+      setFilteredVendors(vendors);
+    }
+  }, [searchTerm, vendors]);
 
   const fetchVendors = async () => {
     try {
@@ -71,105 +73,55 @@ const AdminVendorManagement = () => {
       setVendors(data || []);
     } catch (error) {
       console.error('Error fetching vendors:', error);
-      toast.error('Failed to fetch vendors');
+      toast.error('Failed to load vendors');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const filterVendors = () => {
-    let filtered = vendors;
-
-    if (searchTerm) {
-      filtered = filtered.filter(vendor =>
-        vendor.legal_entity_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.vendor_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        vendor.city.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(vendor => vendor.registration_status === statusFilter);
-    }
-
-    setFilteredVendors(filtered);
-  };
-
-  const updateVendorStatus = async (vendorId: string, newStatus: string, notes?: string) => {
+  const handleDeleteVendor = async (vendorId: string) => {
     try {
-      const { error } = await supabase
-        .from('vendors')
-        .update({ registration_status: newStatus })
+      // Delete vendor documents first
+      const { error: documentsError } = await supabase
+        .from('vendor_documents')
+        .delete()
         .eq('vendor_id', vendorId);
 
-      if (error) throw error;
+      if (documentsError) throw documentsError;
 
-      await supabase
-        .from('audit_logs')
-        .insert({
-          vendor_id: vendorId,
-          action: 'STATUS_UPDATE',
-          entity_type: 'vendor',
-          entity_id: vendorId,
-          new_values: { registration_status: newStatus, admin_notes: notes },
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
+      // Delete vendor profiles
+      const { error: profilesError } = await supabase
+        .from('vendor_profiles')
+        .delete()
+        .eq('vendor_id', vendorId);
 
-      const vendor = vendors.find(v => v.vendor_id === vendorId);
-      if (vendor) {
-        await supabase.functions.invoke('send-confirmation-email', {
-          body: {
-            email: vendor.email,
-            vendorId: vendorId,
-            section: 'vendor',
-            action: newStatus === 'approved' ? 'approval' : 'rejection',
-            notes: notes
-          }
-        });
-      }
+      if (profilesError) throw profilesError;
 
-      toast.success(`Vendor status updated to ${newStatus}. Confirmation email sent.`);
-      fetchVendors();
-      setSelectedVendor(null);
-      setReviewNotes('');
-      setShowReviewDialog(false);
-    } catch (error) {
-      console.error('Error updating vendor status:', error);
-      toast.error('Failed to update vendor status');
-    }
-  };
+      // Delete verification documents
+      const { error: verificationError } = await supabase
+        .from('verification_documents')
+        .delete()
+        .eq('vendor_id', vendorId);
 
-  const deleteVendor = async (vendorId: string) => {
-    try {
-      // Delete from all related tables
-      await supabase.from('verification_documents').delete().eq('vendor_id', vendorId);
-      await supabase.from('vendor_profiles').delete().eq('vendor_id', vendorId);
-      await supabase.from('documents').delete().eq('vendor_id', vendorId);
-      await supabase.from('users').delete().eq('vendor_id', vendorId);
-      
+      if (verificationError) throw verificationError;
+
+      // Delete user credentials
+      const { error: usersError } = await supabase
+        .from('users')
+        .delete()
+        .eq('vendor_id', vendorId);
+
+      if (usersError) throw usersError;
+
       // Finally delete the vendor
-      const { error } = await supabase
+      const { error: vendorError } = await supabase
         .from('vendors')
         .delete()
         .eq('vendor_id', vendorId);
 
-      if (error) throw error;
+      if (vendorError) throw vendorError;
 
-      // Log the deletion
-      await supabase
-        .from('audit_logs')
-        .insert({
-          vendor_id: vendorId,
-          action: 'DELETE',
-          entity_type: 'vendor',
-          entity_id: vendorId,
-          ip_address: '127.0.0.1',
-          user_agent: navigator.userAgent
-        });
-
-      toast.success('Vendor and all related data deleted successfully');
+      toast.success('Vendor deleted successfully');
       fetchVendors();
     } catch (error) {
       console.error('Error deleting vendor:', error);
@@ -177,277 +129,141 @@ const AdminVendorManagement = () => {
     }
   };
 
-  const handleVendorUpdate = (updatedVendor: Vendor) => {
-    setVendors(prev => prev.map(v => v.vendor_id === updatedVendor.vendor_id ? updatedVendor : v));
-    setEditingVendor(null);
-  };
-
-  const exportToCSV = () => {
-    const csvContent = [
-      ['Vendor ID', 'Company Name', 'Email', 'Status', 'Type', 'Location', 'Registration Date'],
-      ...filteredVendors.map(vendor => [
-        vendor.vendor_id,
-        vendor.legal_entity_name,
-        vendor.email,
-        vendor.registration_status,
-        vendor.vendor_type,
-        `${vendor.city}, ${vendor.state}, ${vendor.country}`,
-        new Date(vendor.created_at).toLocaleDateString()
-      ])
-    ].map(row => row.join(',')).join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'vendors_export.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const handleEditVendor = (vendorId: string) => {
+    // Store the vendor ID for editing and navigate to vendor profile
+    localStorage.setItem('editingVendorId', vendorId);
+    navigate(`/vendor-profile?edit=true&vendorId=${vendorId}`);
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="secondary">Pending Review</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Pending</Badge>;
       case 'approved':
         return <Badge variant="default" className="bg-green-100 text-green-800">Approved</Badge>;
       case 'rejected':
         return <Badge variant="destructive">Rejected</Badge>;
-      case 'suspended':
-        return <Badge variant="destructive">Suspended</Badge>;
+      case 'incomplete':
+        return <Badge variant="outline">Incomplete</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
     }
   };
 
-  const handleViewVendor = (vendor: Vendor) => {
-    setSelectedVendor(vendor);
-    setShowDetailsModal(true);
-  };
-
-  const handleEditVendor = (vendor: Vendor) => {
-    setEditingVendor(vendor);
-  };
-
-  const handleReviewVendor = (vendor: Vendor) => {
-    setSelectedVendor(vendor);
-    setShowReviewDialog(true);
-  };
-
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Loading vendors...</div>
-      </div>
+      <Card>
+        <CardContent className="flex items-center justify-center py-8">
+          <div className="text-lg">Loading vendors...</div>
+        </CardContent>
+      </Card>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Vendor Management</h2>
-        <Button onClick={exportToCSV} className="flex items-center gap-2">
-          <Download className="h-4 w-4" />
-          Export CSV
-        </Button>
-      </div>
-
-      {/* Filters */}
+    <>
       <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-4 items-center">
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by company name, email, vendor ID, or location..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+        <CardHeader>
+          <CardTitle>Vendor Management</CardTitle>
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-sm">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+              <Input
+                placeholder="Search vendors..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Filter by status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="pending">Pending Review</SelectItem>
-                <SelectItem value="approved">Approved</SelectItem>
-                <SelectItem value="rejected">Rejected</SelectItem>
-                <SelectItem value="suspended">Suspended</SelectItem>
-              </SelectContent>
-            </Select>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Vendor ID</TableHead>
+                  <TableHead>Legal Entity Name</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Location</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead>Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredVendors.map((vendor) => (
+                  <TableRow key={vendor.vendor_id}>
+                    <TableCell className="font-medium">{vendor.vendor_id}</TableCell>
+                    <TableCell>{vendor.legal_entity_name}</TableCell>
+                    <TableCell>{vendor.email}</TableCell>
+                    <TableCell>{vendor.vendor_type}</TableCell>
+                    <TableCell>{vendor.city}, {vendor.state}</TableCell>
+                    <TableCell>{getStatusBadge(vendor.registration_status)}</TableCell>
+                    <TableCell>{new Date(vendor.created_at).toLocaleDateString()}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setSelectedVendor(vendor);
+                            setIsModalOpen(true);
+                          }}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleEditVendor(vendor.vendor_id)}
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="outline" size="sm">
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent>
+                            <AlertDialogHeader>
+                              <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to permanently delete this vendor? This will remove all vendor data, documents, and credentials. This action cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                onClick={() => handleDeleteVendor(vendor.vendor_id)}
+                                className="bg-red-600 hover:bg-red-700"
+                              >
+                                Delete Permanently
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         </CardContent>
       </Card>
 
-      {/* Vendors Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Vendors ({filteredVendors.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vendor ID</TableHead>
-                <TableHead>Company Name</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Registration Date</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredVendors.map((vendor) => (
-                <TableRow key={vendor.vendor_id}>
-                  <TableCell className="font-mono">{vendor.vendor_id}</TableCell>
-                  <TableCell className="font-medium">{vendor.legal_entity_name}</TableCell>
-                  <TableCell>{vendor.email}</TableCell>
-                  <TableCell>{getStatusBadge(vendor.registration_status)}</TableCell>
-                  <TableCell className="capitalize">{vendor.vendor_type}</TableCell>
-                  <TableCell>{vendor.city}, {vendor.state}</TableCell>
-                  <TableCell>{new Date(vendor.created_at).toLocaleDateString()}</TableCell>
-                  <TableCell>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleViewVendor(vendor)}
-                        title="View Details"
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleEditVendor(vendor)}
-                        title="Edit Vendor"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => handleReviewVendor(vendor)}
-                        title="Review Status"
-                      >
-                        Review
-                      </Button>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="text-red-600 hover:text-red-700"
-                            title="Delete Vendor"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete {vendor.legal_entity_name}? This action cannot be undone and will permanently remove all vendor data including credentials and documents.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => deleteVendor(vendor.vendor_id)}
-                              className="bg-red-600 hover:bg-red-700"
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-
-      {/* Vendor Details Modal */}
       <VendorDetailsModal
         vendor={selectedVendor}
-        isOpen={showDetailsModal}
+        isOpen={isModalOpen}
         onClose={() => {
-          setShowDetailsModal(false);
+          setIsModalOpen(false);
           setSelectedVendor(null);
         }}
       />
-
-      {/* Edit Vendor Modal */}
-      {editingVendor && (
-        <VendorProfileEditor
-          vendor={editingVendor}
-          onUpdate={handleVendorUpdate}
-          isAdmin={true}
-        />
-      )}
-
-      {/* Review Dialog */}
-      <Dialog open={showReviewDialog} onOpenChange={setShowReviewDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Review Vendor: {selectedVendor?.legal_entity_name}</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label>Vendor ID</Label>
-              <p className="font-mono text-sm">{selectedVendor?.vendor_id}</p>
-            </div>
-            <div>
-              <Label>Current Status</Label>
-              <div className="mt-1">{selectedVendor && getStatusBadge(selectedVendor.registration_status)}</div>
-            </div>
-            <div>
-              <Label htmlFor="reviewNotes">Review Notes (optional)</Label>
-              <Textarea
-                id="reviewNotes"
-                value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                placeholder="Add notes about this decision..."
-                rows={3}
-              />
-            </div>
-            <div className="flex gap-2">
-              <Button
-                className="flex-1 bg-green-600 hover:bg-green-700"
-                onClick={() => selectedVendor && updateVendorStatus(selectedVendor.vendor_id, 'approved', reviewNotes)}
-              >
-                <Check className="h-4 w-4 mr-2" />
-                Approve
-              </Button>
-              <Button
-                variant="destructive"
-                className="flex-1"
-                onClick={() => selectedVendor && updateVendorStatus(selectedVendor.vendor_id, 'rejected', reviewNotes)}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Reject
-              </Button>
-            </div>
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => selectedVendor && updateVendorStatus(selectedVendor.vendor_id, 'suspended', reviewNotes)}
-            >
-              Suspend
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </div>
+    </>
   );
 };
 

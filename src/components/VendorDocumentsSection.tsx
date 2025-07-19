@@ -4,9 +4,20 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Check, X, Upload, Save, Trash2 } from "lucide-react";
+import { Upload, FileText, Download, Trash2, Edit2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 interface VendorData {
   vendor_id: string;
@@ -44,181 +55,354 @@ interface Props {
   onUpdate: (updatedVendor: VendorData) => void;
 }
 
-interface VerificationDocs {
+interface DocumentData {
+  w9_form?: string;
   ein_verification_letter?: string;
   articles_of_incorporation?: string;
   business_licenses?: string;
-  w9_form?: string;
-  w9_ein?: string;
   irs_tax_compliance_cert?: string;
   sec_filings?: string;
   osha_epa_labor_compliance?: string;
   fcpa_hipaa_compliance?: string;
 }
 
+interface UploadedDocument {
+  id: string;
+  document_name: string;
+  document_type: string;
+  file_path?: string;
+  upload_date: string;
+  file_size?: number;
+  document_url?: string;
+}
+
 const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
-  const [verificationDocs, setVerificationDocs] = useState<VerificationDocs>({});
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState<DocumentData>({});
   const [isLoading, setIsLoading] = useState(false);
-  const [hasChanges, setHasChanges] = useState(false);
+  const [uploadedDocuments, setUploadedDocuments] = useState<UploadedDocument[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: boolean }>({});
+
+  const documentFields = [
+    { key: 'w9_form', label: 'W-9 / EIN Form', accept: '.pdf,.doc,.docx' },
+    { key: 'ein_verification_letter', label: 'EIN Verification Letter', accept: '.pdf,.doc,.docx' },
+    { key: 'articles_of_incorporation', label: 'Articles of Incorporation', accept: '.pdf,.doc,.docx' },
+    { key: 'business_licenses', label: 'Business Licenses', accept: '.pdf,.doc,.docx' },
+    { key: 'irs_tax_compliance_cert', label: 'IRS Tax Compliance Cert.', accept: '.pdf,.doc,.docx' },
+    { key: 'sec_filings', label: 'SEC Filings (if public)', accept: '.pdf,.doc,.docx' },
+    { key: 'osha_epa_labor_compliance', label: 'OSHA / EPA / Labor Compliance', accept: '.pdf,.doc,.docx' },
+    { key: 'fcpa_hipaa_compliance', label: 'FCPA / HIPAA Compliance', accept: '.pdf,.doc,.docx' }
+  ];
 
   useEffect(() => {
-    fetchVerificationDocuments();
+    fetchDocumentData();
+    fetchUploadedDocuments();
   }, [vendor.vendor_id]);
 
-  const fetchVerificationDocuments = async () => {
+  const fetchDocumentData = async () => {
     try {
-      const { data: docs, error } = await supabase
+      const { data: documents, error } = await supabase
         .from('verification_documents')
         .select('*')
         .eq('vendor_id', vendor.vendor_id)
         .single();
 
-      if (!error && docs) {
-        setVerificationDocs(docs);
+      if (!error && documents) {
+        setEditedData({
+          w9_form: documents.w9_form || '',
+          ein_verification_letter: documents.ein_verification_letter || '',
+          articles_of_incorporation: documents.articles_of_incorporation || '',
+          business_licenses: documents.business_licenses || '',
+          irs_tax_compliance_cert: documents.irs_tax_compliance_cert || '',
+          sec_filings: documents.sec_filings || '',
+          osha_epa_labor_compliance: documents.osha_epa_labor_compliance || '',
+          fcpa_hipaa_compliance: documents.fcpa_hipaa_compliance || ''
+        });
       }
     } catch (error) {
-      console.error('Error fetching verification documents:', error);
+      console.error('Error fetching document data:', error);
     }
   };
 
-  const handleDocumentUpload = async (field: keyof VerificationDocs, file: File) => {
-    if (!vendor) return;
-
+  const fetchUploadedDocuments = async () => {
     try {
-      const updatedDocs = {
-        ...verificationDocs,
-        [field]: file.name
-      };
+      const { data: documents, error } = await supabase
+        .from('vendor_documents')
+        .select('*')
+        .eq('vendor_id', vendor.vendor_id)
+        .order('upload_date', { ascending: false });
 
-      setVerificationDocs(updatedDocs);
-      setHasChanges(true);
-      toast.success('Document selected for upload');
+      if (!error && documents) {
+        setUploadedDocuments(documents);
+      }
     } catch (error) {
-      console.error('Error selecting document:', error);
-      toast.error('Failed to select document');
+      console.error('Error fetching uploaded documents:', error);
     }
   };
 
-  const handleDocumentDelete = async (field: keyof VerificationDocs) => {
-    try {
-      const updatedDocs = {
-        ...verificationDocs,
-        [field]: null
-      };
-
-      setVerificationDocs(updatedDocs);
-      setHasChanges(true);
-      toast.success('Document removed');
-    } catch (error) {
-      console.error('Error removing document:', error);
-      toast.error('Failed to remove document');
-    }
+  const handleEdit = () => {
+    setIsEditing(true);
   };
 
-  const handleSaveDocuments = async () => {
+  const handleSave = async () => {
     setIsLoading(true);
     try {
       const { error } = await supabase
         .from('verification_documents')
         .upsert({
           vendor_id: vendor.vendor_id,
-          ...verificationDocs
+          ...editedData
         });
 
       if (error) throw error;
 
-      setHasChanges(false);
-      toast.success('Verification documents saved successfully');
+      setIsEditing(false);
+      toast.success('Document information saved successfully');
     } catch (error) {
-      console.error('Error saving verification documents:', error);
-      toast.error('Failed to save verification documents');
+      console.error('Error saving document information:', error);
+      toast.error('Failed to save document information');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const documentFields = [
-    { key: 'ein_verification_letter', label: 'EIN Verification Letter (Form SS-4)' },
-    { key: 'articles_of_incorporation', label: 'Articles of Incorporation' },
-    { key: 'business_licenses', label: 'Business Licenses or State Registration' },
-    { key: 'w9_form', label: 'W-9 Form Upload' },
-    { key: 'w9_ein', label: 'W-9 / EIN' },
-    { key: 'irs_tax_compliance_cert', label: 'IRS Tax Compliance Cert.' },
-    { key: 'sec_filings', label: 'SEC Filings (if public)' },
-    { key: 'osha_epa_labor_compliance', label: 'OSHA / EPA / Labor Compliance' },
-    { key: 'fcpa_hipaa_compliance', label: 'FCPA / HIPAA Compliance' }
-  ];
+  const handleCancel = () => {
+    fetchDocumentData();
+    setIsEditing(false);
+  };
+
+  const handleInputChange = (field: keyof DocumentData, value: string) => {
+    setEditedData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleFileUpload = async (file: File, documentType: string) => {
+    if (file.size > 10 * 1024 * 1024) { // 10MB limit
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+
+    setUploadingFiles(prev => ({ ...prev, [documentType]: true }));
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${vendor.vendor_id}/${documentType}_${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('vendor-documents')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('vendor-documents')
+        .getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase
+        .from('vendor_documents')
+        .insert({
+          vendor_id: vendor.vendor_id,
+          document_name: file.name,
+          document_type: documentType,
+          document_category: 'verification',
+          file_path: fileName,
+          document_url: publicUrl,
+          file_size: file.size,
+          mime_type: file.type,
+          uploaded_by: 'vendor'
+        });
+
+      if (dbError) throw dbError;
+
+      toast.success('Document uploaded successfully');
+      fetchUploadedDocuments();
+    } catch (error) {
+      console.error('Error uploading document:', error);
+      toast.error('Failed to upload document');
+    } finally {
+      setUploadingFiles(prev => ({ ...prev, [documentType]: false }));
+    }
+  };
+
+  const handleDeleteDocument = async (documentId: string, fileName: string) => {
+    try {
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('vendor-documents')
+        .remove([fileName]);
+
+      if (storageError) throw storageError;
+
+      // Delete from database
+      const { error: dbError } = await supabase
+        .from('vendor_documents')
+        .delete()
+        .eq('id', documentId);
+
+      if (dbError) throw dbError;
+
+      toast.success('Document deleted successfully');
+      fetchUploadedDocuments();
+    } catch (error) {
+      console.error('Error deleting document:', error);
+      toast.error('Failed to delete document');
+    }
+  };
+
+  const handleDownload = async (documentUrl: string, fileName: string) => {
+    try {
+      const link = document.createElement('a');
+      link.href = documentUrl;
+      link.download = fileName;
+      link.click();
+    } catch (error) {
+      console.error('Error downloading document:', error);
+      toast.error('Failed to download document');
+    }
+  };
 
   return (
     <Card>
       <CardHeader>
         <div className="flex justify-between items-center">
           <div>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="h-5 w-5" />
-              Verification Documents
-            </CardTitle>
-            <p className="text-sm text-gray-600">Upload required verification documents</p>
+            <CardTitle>Verification Documents</CardTitle>
+            <p className="text-sm text-gray-600">Upload and manage verification documents</p>
           </div>
-          {hasChanges && (
-            <Button onClick={handleSaveDocuments} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
-              <Save className="h-4 w-4 mr-2" />
-              {isLoading ? 'Saving...' : 'Save Documents'}
+          {!isEditing && (
+            <Button variant="outline" onClick={handleEdit} className="flex items-center gap-2">
+              <Edit2 className="h-4 w-4" />
+              Edit
             </Button>
           )}
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {documentFields.map((field) => (
-            <div key={field.key} className="border rounded-lg p-4">
-              <div className="flex justify-between items-center mb-2">
+        {/* Document Upload Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Document Upload</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {documentFields.map((field) => (
+              <div key={field.key} className="space-y-2">
                 <Label>{field.label}</Label>
                 <div className="flex items-center gap-2">
-                  {verificationDocs[field.key as keyof VerificationDocs] ? (
-                    <Check className="h-4 w-4 text-green-600" />
-                  ) : (
-                    <X className="h-4 w-4 text-gray-400" />
-                  )}
-                  {verificationDocs[field.key as keyof VerificationDocs] && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDocumentDelete(field.key as keyof VerificationDocs)}
-                      className="text-red-600 hover:text-red-700 p-1"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  <Input
+                    type="file"
+                    accept={field.accept}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        handleFileUpload(file, field.key);
+                      }
+                    }}
+                    disabled={uploadingFiles[field.key]}
+                    className="flex-1"
+                  />
+                  {uploadingFiles[field.key] && (
+                    <div className="text-sm text-gray-500">Uploading...</div>
                   )}
                 </div>
               </div>
-              {verificationDocs[field.key as keyof VerificationDocs] ? (
-                <p className="text-sm text-gray-600 mb-2">{verificationDocs[field.key as keyof VerificationDocs]}</p>
-              ) : (
-                <p className="text-sm text-gray-500 mb-2">No document uploaded</p>
-              )}
-              <Input
-                type="file"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleDocumentUpload(field.key as keyof VerificationDocs, file);
-                }}
-                accept=".pdf,.jpg,.jpeg,.png"
-              />
-              <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG accepted</p>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
 
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h4 className="font-medium text-blue-900 mb-2">Document Requirements</h4>
-          <ul className="text-sm text-blue-800 space-y-1">
-            <li>• All documents must be clear and legible</li>
-            <li>• Accepted formats: PDF, JPG, PNG</li>
-            <li>• Maximum file size: 10MB per document</li>
-            <li>• Documents will be reviewed within 2-3 business days</li>
-          </ul>
+        {/* Uploaded Documents Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Uploaded Documents</h3>
+          {uploadedDocuments.length > 0 ? (
+            <div className="space-y-2">
+              {uploadedDocuments.map((doc) => (
+                <div key={doc.id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <FileText className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="font-medium">{doc.document_name}</p>
+                      <p className="text-sm text-gray-500">
+                        {doc.document_type} • {new Date(doc.upload_date).toLocaleDateString()} • {doc.file_size ? `${Math.round(doc.file_size / 1024)} KB` : 'Unknown size'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {doc.document_url && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleDownload(doc.document_url!, doc.document_name)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    )}
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Trash2 className="h-4 w-4 text-red-600" />
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>Delete Document</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to delete "{doc.document_name}"? This action cannot be undone.
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={() => handleDeleteDocument(doc.id, doc.file_path || '')}
+                            className="bg-red-600 hover:bg-red-700"
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-500 text-center py-8">No documents uploaded yet</p>
+          )}
         </div>
+
+        {/* Document Links Section */}
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold">Document Links</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {documentFields.map((field) => (
+              <div key={field.key}>
+                <Label>{field.label}</Label>
+                {isEditing ? (
+                  <Input
+                    value={editedData[field.key as keyof DocumentData] || ''}
+                    onChange={(e) => handleInputChange(field.key as keyof DocumentData, e.target.value)}
+                    placeholder={`Enter ${field.label} link or reference`}
+                  />
+                ) : (
+                  <Input 
+                    value={editedData[field.key as keyof DocumentData] || ''} 
+                    readOnly 
+                    className="bg-gray-50" 
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Save/Cancel Buttons */}
+        {isEditing && (
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={handleCancel}>
+              <X className="h-4 w-4 mr-2" />
+              Cancel
+            </Button>
+            <Button onClick={handleSave} disabled={isLoading} className="bg-blue-600 hover:bg-blue-700">
+              <Save className="h-4 w-4 mr-2" />
+              {isLoading ? 'Saving...' : 'Save Documents'}
+            </Button>
+          </div>
+        )}
       </CardContent>
     </Card>
   );
