@@ -60,10 +60,6 @@ interface DocumentData {
   ein_verification_letter?: string;
   articles_of_incorporation?: string;
   business_licenses?: string;
-  irs_tax_compliance_cert?: string;
-  sec_filings?: string;
-  osha_epa_labor_compliance?: string;
-  fcpa_hipaa_compliance?: string;
 }
 
 interface UploadedDocument {
@@ -87,11 +83,7 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
     { key: 'w9_form', label: 'W-9 / EIN Form', accept: '.pdf,.doc,.docx' },
     { key: 'ein_verification_letter', label: 'EIN Verification Letter', accept: '.pdf,.doc,.docx' },
     { key: 'articles_of_incorporation', label: 'Articles of Incorporation', accept: '.pdf,.doc,.docx' },
-    { key: 'business_licenses', label: 'Business Licenses', accept: '.pdf,.doc,.docx' },
-    { key: 'irs_tax_compliance_cert', label: 'IRS Tax Compliance Cert.', accept: '.pdf,.doc,.docx' },
-    { key: 'sec_filings', label: 'SEC Filings (if public)', accept: '.pdf,.doc,.docx' },
-    { key: 'osha_epa_labor_compliance', label: 'OSHA / EPA / Labor Compliance', accept: '.pdf,.doc,.docx' },
-    { key: 'fcpa_hipaa_compliance', label: 'FCPA / HIPAA Compliance', accept: '.pdf,.doc,.docx' }
+    { key: 'business_licenses', label: 'Business Licenses', accept: '.pdf,.doc,.docx' }
   ];
 
   useEffect(() => {
@@ -112,11 +104,7 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
           w9_form: documents.w9_form || '',
           ein_verification_letter: documents.ein_verification_letter || '',
           articles_of_incorporation: documents.articles_of_incorporation || '',
-          business_licenses: documents.business_licenses || '',
-          irs_tax_compliance_cert: documents.irs_tax_compliance_cert || '',
-          sec_filings: documents.sec_filings || '',
-          osha_epa_labor_compliance: documents.osha_epa_labor_compliance || '',
-          fcpa_hipaa_compliance: documents.fcpa_hipaa_compliance || ''
+          business_licenses: documents.business_licenses || ''
         });
       }
     } catch (error) {
