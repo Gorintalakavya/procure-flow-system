@@ -436,11 +436,11 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
                     <SelectValue placeholder="Select annual revenue" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="< $1M">< $1M</SelectItem>
-                    <SelectItem value="$1M - $10M">$1M - $10M</SelectItem>
-                    <SelectItem value="$10M - $50M">$10M - $50M</SelectItem>
-                    <SelectItem value="$50M - $100M">$50M - $100M</SelectItem>
-                    <SelectItem value="$100M+">$100M+</SelectItem>
+                    <SelectItem value="under_1m">Under $1M</SelectItem>
+                    <SelectItem value="1m_10m">$1M - $10M</SelectItem>
+                    <SelectItem value="10m_50m">$10M - $50M</SelectItem>
+                    <SelectItem value="50m_100m">$50M - $100M</SelectItem>
+                    <SelectItem value="over_100m">Over $100M</SelectItem>
                   </SelectContent>
                 </Select>
               ) : (
