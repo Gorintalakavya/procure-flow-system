@@ -29,7 +29,7 @@ const AdminSettings = () => {
     smtpPort: '587',
     smtpUsername: '',
     smtpPassword: '',
-    fromEmail: 'noreply@vendormanagement.com',
+    fromEmail: 'support@innosoul.com',
     fromName: 'Vendor Management System'
   });
 
