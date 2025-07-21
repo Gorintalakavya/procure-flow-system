@@ -81,79 +81,8 @@ const AdminVendorManagement = () => {
 
   const handleDeleteVendor = async (vendorId: string) => {
     try {
-      // Delete all related records first
-      
-      // Delete compliance tracking
-      const { error: complianceError } = await supabase
-        .from('compliance_tracking')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (complianceError) console.warn('Compliance tracking deletion error:', complianceError);
-
-      // Delete analytics reports
-      const { error: analyticsError } = await supabase
-        .from('analytics_reports')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (analyticsError) console.warn('Analytics reports deletion error:', analyticsError);
-
-      // Delete notifications
-      const { error: notificationsError } = await supabase
-        .from('notifications')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (notificationsError) console.warn('Notifications deletion error:', notificationsError);
-
-      // Delete notification preferences
-      const { error: preferencesError } = await supabase
-        .from('notification_preferences')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (preferencesError) console.warn('Notification preferences deletion error:', preferencesError);
-
-      // Delete user roles
-      const { error: rolesError } = await supabase
-        .from('user_roles')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (rolesError) console.warn('User roles deletion error:', rolesError);
-
-      // Delete documents
-      const { error: documentsError } = await supabase
-        .from('documents')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (documentsError) console.warn('Documents deletion error:', documentsError);
-
-      // Delete vendor documents
-      const { error: vendorDocsError } = await supabase
-        .from('vendor_documents')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (vendorDocsError) console.warn('Vendor documents deletion error:', vendorDocsError);
-
-      // Delete vendor profiles
-      const { error: profilesError } = await supabase
-        .from('vendor_profiles')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (profilesError) console.warn('Vendor profiles deletion error:', profilesError);
-
-      // Delete verification documents
-      const { error: verificationError } = await supabase
-        .from('verification_documents')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (verificationError) console.warn('Verification documents deletion error:', verificationError);
-
-      // Delete user credentials
-      const { error: usersError } = await supabase
-        .from('users')
-        .delete()
-        .eq('vendor_id', vendorId);
-      if (usersError) console.warn('Users deletion error:', usersError);
-
-      // Finally delete the vendor
+      // With CASCADE DELETE constraints, we only need to delete the vendor
+      // All related records will be automatically deleted
       const { error: vendorError } = await supabase
         .from('vendors')
         .delete()
