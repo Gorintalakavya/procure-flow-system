@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Edit2, Save, X, Building2 } from "lucide-react";
+import { Edit2, Save, X, Building2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -41,6 +41,15 @@ interface VendorData {
   bank_account_details?: string;
 }
 
+interface VendorProfile {
+  ranking?: string;
+  key_principal?: string;
+  industry?: string;
+  year_started?: string;
+  date_of_incorporation?: string;
+  company_description?: string;
+}
+
 interface Props {
   vendor: VendorData;
   onUpdate: (updatedVendor: VendorData) => void;
@@ -49,11 +58,34 @@ interface Props {
 const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [editedVendor, setEditedVendor] = useState<VendorData>(vendor);
+  const [vendorProfile, setVendorProfile] = useState<VendorProfile>({});
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     setEditedVendor(vendor);
+    fetchVendorProfile();
   }, [vendor]);
+
+  const fetchVendorProfile = async () => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('vendor_profiles')
+        .select('ranking, key_principal, industry, year_started, date_of_incorporation, company_description')
+        .eq('vendor_id', vendor.vendor_id)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching vendor profile:', error);
+        return;
+      }
+
+      if (profile) {
+        setVendorProfile(profile);
+      }
+    } catch (error) {
+      console.error('Error fetching vendor profile:', error);
+    }
+  };
 
   const handleEdit = () => {
     setIsEditing(true);
@@ -62,7 +94,8 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
   const handleSave = async () => {
     setIsLoading(true);
     try {
-      const { error } = await supabase
+      // Update vendors table
+      const { error: vendorError } = await supabase
         .from('vendors')
         .update({
           legal_entity_name: editedVendor.legal_entity_name,
@@ -94,7 +127,22 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
         })
         .eq('vendor_id', vendor.vendor_id);
 
-      if (error) throw error;
+      if (vendorError) throw vendorError;
+
+      // Update or insert vendor profile
+      const { error: profileError } = await supabase
+        .from('vendor_profiles')
+        .upsert({
+          vendor_id: vendor.vendor_id,
+          ranking: vendorProfile.ranking,
+          key_principal: vendorProfile.key_principal,
+          industry: vendorProfile.industry,
+          year_started: vendorProfile.year_started,
+          date_of_incorporation: vendorProfile.date_of_incorporation,
+          company_description: vendorProfile.company_description
+        });
+
+      if (profileError) throw profileError;
 
       onUpdate(editedVendor);
       setIsEditing(false);
@@ -116,6 +164,10 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
     setEditedVendor(prev => ({ ...prev, [field]: value }));
   };
 
+  const handleProfileChange = (field: keyof VendorProfile, value: string) => {
+    setVendorProfile(prev => ({ ...prev, [field]: value }));
+  };
+
   return (
     <Card>
       <CardHeader>
@@ -124,7 +176,7 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
             <Building2 className="h-6 w-6 text-blue-600" />
             <div>
               <CardTitle>Vendor Overview</CardTitle>
-              <p className="text-sm text-gray-600">Basic information and registration details</p>
+              <p className="text-sm text-gray-600">Company overview and general information</p>
             </div>
           </div>
           {!isEditing && (
@@ -136,6 +188,113 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
         </div>
       </CardHeader>
       <CardContent className="space-y-6">
+        {/* Company Description */}
+        <div className="border-b pb-6">
+          <h3 className="text-lg font-semibold mb-4">Company Description</h3>
+          <div>
+            <Label>Products/Services Description</Label>
+            {isEditing ? (
+              <Textarea
+                value={editedVendor.products_services_description || ''}
+                onChange={(e) => handleInputChange('products_services_description', e.target.value)}
+                rows={3}
+                placeholder="Describe the products and services offered by this vendor..."
+              />
+            ) : (
+              <div className="p-3 bg-gray-50 rounded-md min-h-[80px]">
+                {editedVendor.products_services_description || 'No description provided'}
+              </div>
+            )}
+          </div>
+          <div className="mt-4">
+            <Label>Company Description</Label>
+            {isEditing ? (
+              <Textarea
+                value={vendorProfile.company_description || ''}
+                onChange={(e) => handleProfileChange('company_description', e.target.value)}
+                rows={3}
+                placeholder="General company description..."
+              />
+            ) : (
+              <div className="p-3 bg-gray-50 rounded-md min-h-[80px]">
+                {vendorProfile.company_description || 'No description provided'}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Company Information Grid */}
+        <div className="border-b pb-6">
+          <h3 className="text-lg font-semibold mb-4">Company Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label>Ranking</Label>
+              {isEditing ? (
+                <Input
+                  value={vendorProfile.ranking || ''}
+                  onChange={(e) => handleProfileChange('ranking', e.target.value)}
+                  placeholder="e.g., consultant"
+                />
+              ) : (
+                <Input value={vendorProfile.ranking || ''} readOnly className="bg-gray-50" />
+              )}
+            </div>
+            <div>
+              <Label>Key Principal</Label>
+              {isEditing ? (
+                <Input
+                  value={vendorProfile.key_principal || ''}
+                  onChange={(e) => handleProfileChange('key_principal', e.target.value)}
+                  placeholder="Name of key principal"
+                />
+              ) : (
+                <Input value={vendorProfile.key_principal || ''} readOnly className="bg-gray-50" />
+              )}
+            </div>
+            <div>
+              <Label>Industry</Label>
+              {isEditing ? (
+                <Input
+                  value={vendorProfile.industry || ''}
+                  onChange={(e) => handleProfileChange('industry', e.target.value)}
+                  placeholder="Industry sector"
+                />
+              ) : (
+                <Input value={vendorProfile.industry || ''} readOnly className="bg-gray-50" />
+              )}
+            </div>
+            <div>
+              <Label>Year Started</Label>
+              {isEditing ? (
+                <Input
+                  value={vendorProfile.year_started || ''}
+                  onChange={(e) => handleProfileChange('year_started', e.target.value)}
+                  placeholder="e.g., 2007"
+                />
+              ) : (
+                <Input value={vendorProfile.year_started || ''} readOnly className="bg-gray-50" />
+              )}
+            </div>
+            <div>
+              <Label>Date of Incorporation</Label>
+              {isEditing ? (
+                <Input
+                  type="date"
+                  value={vendorProfile.date_of_incorporation || ''}
+                  onChange={(e) => handleProfileChange('date_of_incorporation', e.target.value)}
+                />
+              ) : (
+                <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-md">
+                  <Calendar className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-500">
+                    {vendorProfile.date_of_incorporation || 'mm/dd/yyyy'}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* Basic Information */}
         <div className="border-b pb-6">
           <h3 className="text-lg font-semibold mb-4">Basic Information</h3>
@@ -437,20 +596,58 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
                 <Input value={editedVendor.operating_status || ''} readOnly className="bg-gray-50" />
               )}
             </div>
-          </div>
-          <div className="mt-4">
-            <Label>Products/Services Description</Label>
-            {isEditing ? (
-              <Textarea
-                value={editedVendor.products_services_description || ''}
-                onChange={(e) => handleInputChange('products_services_description', e.target.value)}
-                rows={3}
-              />
-            ) : (
-              <div className="p-3 bg-gray-50 rounded-md min-h-[80px]">
-                {editedVendor.products_services_description || 'No description provided'}
-              </div>
-            )}
+            <div>
+              <Label>Relationship Owner</Label>
+              {isEditing ? (
+                <Input
+                  value={editedVendor.relationship_owner || ''}
+                  onChange={(e) => handleInputChange('relationship_owner', e.target.value)}
+                />
+              ) : (
+                <Input value={editedVendor.relationship_owner || ''} readOnly className="bg-gray-50" />
+              )}
+            </div>
+            <div>
+              <Label>Currency</Label>
+              {isEditing ? (
+                <Select value={editedVendor.currency || 'USD'} onValueChange={(value) => handleInputChange('currency', value)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="EUR">EUR</SelectItem>
+                    <SelectItem value="GBP">GBP</SelectItem>
+                    <SelectItem value="CAD">CAD</SelectItem>
+                    <SelectItem value="AUD">AUD</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input value={editedVendor.currency || 'USD'} readOnly className="bg-gray-50" />
+              )}
+            </div>
+            <div>
+              <Label>Payment Terms</Label>
+              {isEditing ? (
+                <Input
+                  value={editedVendor.payment_terms || ''}
+                  onChange={(e) => handleInputChange('payment_terms', e.target.value)}
+                />
+              ) : (
+                <Input value={editedVendor.payment_terms || ''} readOnly className="bg-gray-50" />
+              )}
+            </div>
+            <div>
+              <Label>Bank Account Details</Label>
+              {isEditing ? (
+                <Input
+                  value={editedVendor.bank_account_details || ''}
+                  onChange={(e) => handleInputChange('bank_account_details', e.target.value)}
+                />
+              ) : (
+                <Input value={editedVendor.bank_account_details || ''} readOnly className="bg-gray-50" />
+              )}
+            </div>
           </div>
         </div>
 
