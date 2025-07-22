@@ -29,8 +29,8 @@ const AdminSettings = () => {
     smtpPort: '587',
     smtpUsername: '',
     smtpPassword: '',
-    fromEmail: 'support@innosoul.com',
-    fromName: 'Vendor Management System'
+    fromEmail: 'contact@iitlabs.us',
+    fromName: 'Shaker'
   });
 
   const [securitySettings, setSecuritySettings] = useState({
