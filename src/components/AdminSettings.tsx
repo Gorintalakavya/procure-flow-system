@@ -25,11 +25,11 @@ const AdminSettings = () => {
   });
 
   const [emailSettings, setEmailSettings] = useState({
-    smtpHost: 'smtp.gmail.com',
-    smtpPort: '587',
-    smtpUsername: '',
-    smtpPassword: '',
-    fromEmail: 'contact@iitlabs.us',
+    smtpHost: 'smtp.iitlabs.com',
+    smtpPort: '465',
+    smtpUsername: 'contact@iitlabs.com',
+    smtpPassword: 'db2@Admin2',
+    fromEmail: 'contact@iitlabs.com',
     fromName: 'Shaker'
   });
 
