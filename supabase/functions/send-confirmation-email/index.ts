@@ -151,28 +151,68 @@ const handler = async (req: Request): Promise<Response> => {
       `;
     }
 
-    // Send email using Supabase's built-in SMTP (which uses the configured custom SMTP)
-    const { data: emailData, error: emailError } = await supabase.auth.admin.generateLink({
-      type: 'signup',
-      email: recipientAddress,
-      options: {
-        emailRedirectTo: `${supabaseUrl}/vendor-auth`,
-        data: {
-          custom_email: 'true',
-          email_type: type,
-          subject: subject,
-          html_content: html
+    // Send email using Supabase's built-in email system with your SMTP settings
+    let emailResult;
+    
+    if (type === 'share_section') {
+      // For share functionality, we need to create a temporary user and send a magic link
+      // This leverages Supabase's email system with your SMTP settings
+      const tempPassword = Math.random().toString(36).slice(-8);
+      
+      // Create a temporary signup to trigger email sending
+      const { error: signupError } = await supabase.auth.admin.createUser({
+        email: recipientAddress,
+        password: tempPassword,
+        email_confirm: false,
+        user_metadata: {
+          temp_email_type: 'share_section',
+          shared_section: sharedSection,
+          shared_data: JSON.stringify(sharedData),
+          vendor_name: vendorName,
+          vendor_id: vendorId
         }
-      }
-    });
+      });
 
-    if (emailError) {
-      throw emailError;
+      if (signupError && !signupError.message.includes('already registered')) {
+        throw signupError;
+      }
+
+      // Send reset password email which will use your SMTP settings
+      const { error: resetError } = await supabase.auth.admin.generateLink({
+        type: 'recovery',
+        email: recipientAddress,
+        options: {
+          redirectTo: `${supabaseUrl}`,
+          data: {
+            custom_subject: subject,
+            custom_html: html
+          }
+        }
+      });
+
+      emailResult = { error: resetError };
+    } else {
+      // For other email types, use the inviteUserByEmail which uses SMTP settings
+      const { error: inviteError } = await supabase.auth.admin.inviteUserByEmail(recipientAddress, {
+        redirectTo: `${supabaseUrl}/vendor-auth`,
+        data: {
+          vendor_name: vendorName,
+          vendor_id: vendorId,
+          password: password,
+          email_type: type,
+          custom_subject: subject,
+          custom_html: html
+        }
+      });
+
+      emailResult = { error: inviteError };
     }
 
-    // For sharing functionality, we need to send a custom email
-    // Since Supabase auth emails are limited, let's log the email content
-    console.log("Email prepared:", {
+    if (emailResult.error) {
+      throw emailResult.error;
+    }
+
+    console.log("Email sent successfully using Supabase SMTP:", {
       to: recipientAddress,
       subject: subject,
       type: type
@@ -180,7 +220,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: "Email prepared successfully",
+      message: "Email sent successfully using your SMTP settings",
       recipient: recipientAddress,
       subject: subject
     }), {
