@@ -123,8 +123,7 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
           products_services_description: editedVendor.products_services_description,
           relationship_owner: editedVendor.relationship_owner,
           currency: editedVendor.currency,
-          payment_terms: editedVendor.payment_terms,
-          bank_account_details: editedVendor.bank_account_details
+          payment_terms: editedVendor.payment_terms
         })
         .eq('vendor_id', vendor.vendor_id);
 
@@ -644,17 +643,6 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
                 />
               ) : (
                 <Input value={editedVendor.payment_terms || ''} readOnly className="bg-gray-50" />
-              )}
-            </div>
-            <div>
-              <Label>Bank Account Details</Label>
-              {isEditing ? (
-                <Input
-                  value={editedVendor.bank_account_details || ''}
-                  onChange={(e) => handleInputChange('bank_account_details', e.target.value)}
-                />
-              ) : (
-                <Input value={editedVendor.bank_account_details || ''} readOnly className="bg-gray-50" />
               )}
             </div>
           </div>

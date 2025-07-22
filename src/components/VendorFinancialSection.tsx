@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Edit2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import SectionShareDialog from "./SectionShareDialog";
 
 interface VendorData {
   vendor_id: string;
@@ -137,10 +138,18 @@ const VendorFinancialSection: React.FC<Props> = ({ vendor, onUpdate }) => {
             <p className="text-sm text-gray-600">Banking details and financial metrics</p>
           </div>
           {!isEditing && (
-            <Button variant="outline" onClick={handleEdit} className="flex items-center gap-2">
-              <Edit2 className="h-4 w-4" />
-              Edit
-            </Button>
+            <div className="flex items-center gap-2">
+              <SectionShareDialog
+                sectionName="Financial Information"
+                sectionData={editedData}
+                vendorName={vendor.legal_entity_name}
+                vendorId={vendor.vendor_id}
+              />
+              <Button variant="outline" onClick={handleEdit} className="flex items-center gap-2">
+                <Edit2 className="h-4 w-4" />
+                Edit
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>

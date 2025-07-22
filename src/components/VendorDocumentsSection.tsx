@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Upload, FileText, Download, Trash2, Edit2, Save, X } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import SectionShareDialog from "./SectionShareDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,7 +70,6 @@ interface UploadedDocument {
   file_path?: string;
   upload_date: string;
   file_size?: number;
-  document_url?: string;
 }
 
 const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
@@ -193,7 +193,6 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
           document_type: documentType,
           document_category: 'verification',
           file_path: fileName,
-          document_url: publicUrl,
           file_size: file.size,
           mime_type: file.type,
           uploaded_by: 'vendor'
@@ -257,10 +256,18 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
             <p className="text-sm text-gray-600">Upload and manage verification documents</p>
           </div>
           {!isEditing && (
-            <Button variant="outline" onClick={handleEdit} className="flex items-center gap-2">
-              <Edit2 className="h-4 w-4" />
-              Edit
-            </Button>
+            <div className="flex items-center gap-2">
+              <SectionShareDialog
+                sectionName="Verification Documents"
+                sectionData={{ ...editedData, uploadedDocuments }}
+                vendorName={vendor.legal_entity_name}
+                vendorId={vendor.vendor_id}
+              />
+              <Button variant="outline" onClick={handleEdit} className="flex items-center gap-2">
+                <Edit2 className="h-4 w-4" />
+                Edit
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>
@@ -311,11 +318,11 @@ const VendorDocumentsSection: React.FC<Props> = ({ vendor, onUpdate }) => {
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {doc.document_url && (
+                    {doc.file_path && (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDownload(doc.document_url!, doc.document_name)}
+                        onClick={() => handleDownload(`${supabase.storage.from('vendor-documents').getPublicUrl(doc.file_path!).data.publicUrl}`, doc.document_name)}
                       >
                         <Download className="h-4 w-4" />
                       </Button>
