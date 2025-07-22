@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Edit2, Save, X, Building2, Calendar } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import SectionShareDialog from "./SectionShareDialog";
 
 interface VendorData {
   vendor_id: string;
@@ -180,10 +181,18 @@ const VendorOverviewSection: React.FC<Props> = ({ vendor, onUpdate }) => {
             </div>
           </div>
           {!isEditing && (
-            <Button variant="outline" onClick={handleEdit} className="flex items-center gap-2">
-              <Edit2 className="h-4 w-4" />
-              Edit
-            </Button>
+            <div className="flex items-center gap-2">
+              <SectionShareDialog
+                sectionName="Overview"
+                sectionData={{ ...editedVendor, ...vendorProfile }}
+                vendorName={editedVendor.legal_entity_name}
+                vendorId={editedVendor.vendor_id}
+              />
+              <Button variant="outline" onClick={handleEdit} className="flex items-center gap-2">
+                <Edit2 className="h-4 w-4" />
+                Edit
+              </Button>
+            </div>
           )}
         </div>
       </CardHeader>

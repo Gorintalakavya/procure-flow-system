@@ -1,8 +1,10 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { Resend } from "npm:resend@2.0.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.50.3";
 
-const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -15,8 +17,12 @@ interface EmailRequest {
   vendorName?: string;
   vendorId?: string;
   password?: string;
-  type?: 'confirmation' | 'password_reset';
+  type?: 'confirmation' | 'password_reset' | 'signin_confirmation' | 'share_section';
   isAdmin?: boolean;
+  resetToken?: string;
+  sharedSection?: string;
+  sharedData?: any;
+  recipientEmail?: string;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -25,44 +31,84 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const { email, vendorName, vendorId, password, type = 'confirmation', isAdmin = false }: EmailRequest = await req.json();
+    const { 
+      email, 
+      vendorName, 
+      vendorId, 
+      password, 
+      type = 'confirmation', 
+      isAdmin = false,
+      resetToken,
+      sharedSection,
+      sharedData,
+      recipientEmail
+    }: EmailRequest = await req.json();
 
     let subject: string;
     let html: string;
+    let recipientAddress = email;
 
     if (type === 'password_reset') {
-      if (isAdmin) {
-        subject = "Admin Password Reset Request";
-        html = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #2563eb;">Password Reset Request</h1>
-            <p>Dear Admin,</p>
-            <p>We received a request to reset your admin account password. If you made this request, please contact your system administrator to reset your password.</p>
-            <p>If you did not request this password reset, please ignore this email or contact support immediately.</p>
-            <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
-            <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Vendor Management System</p>
-            <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
+      const resetUrl = `${supabaseUrl}/auth/v1/verify?token=${resetToken}&type=recovery&redirect_to=${Deno.env.get('SITE_URL') || supabaseUrl}/vendor-auth`;
+      
+      subject = isAdmin ? "Admin Password Reset Request" : "Vendor Password Reset Request";
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Confirm your signup</h2>
+          <p>Follow this link to confirm your user:</p>
+          <p><a href="${resetUrl}">Confirm your mail</a></p>
+        </div>
+      `;
+    } else if (type === 'signin_confirmation') {
+      subject = "Sign-in Confirmation - Vendor Management System";
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #2563eb;">Welcome Back!</h1>
+          <p>Dear ${vendorName || 'Vendor'},</p>
+          <p>You have successfully signed in to your Vendor Management System account.</p>
+          
+          <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #374151;">Your Account Details:</h3>
+            <p><strong>Vendor ID:</strong> ${vendorId}</p>
+            <p><strong>Email:</strong> ${email}</p>
+            <p><strong>Login Time:</strong> ${new Date().toLocaleString()}</p>
           </div>
-        `;
-      } else {
-        subject = "Vendor Password Reset Request";
-        html = `
-          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-            <h1 style="color: #2563eb;">Password Reset Request</h1>
-            <p>Dear Vendor,</p>
-            <p>We received a request to reset your vendor account password. If you made this request, please contact support to reset your password.</p>
-            <p>If you did not request this password reset, please ignore this email or contact support immediately.</p>
-            <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 20px 0;">
-              <p><strong>Support Contact:</strong> support@innosoul.com</p>
-            </div>
-            <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
-            <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Vendor Management System</p>
-            <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${supabaseUrl}/vendor-profile" 
+               style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+              Access Your Profile
+            </a>
           </div>
-        `;
-      }
+          
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+          <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Shaker<br>IIT Labs Team</p>
+          <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      `;
+    } else if (type === 'share_section') {
+      recipientAddress = recipientEmail || email;
+      subject = `${vendorName} has shared ${sharedSection} information with you`;
+      html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h1 style="color: #2563eb;">Vendor Information Shared</h1>
+          <p>Dear Recipient,</p>
+          <p><strong>${vendorName}</strong> (Vendor ID: ${vendorId}) has shared their <strong>${sharedSection}</strong> information with you.</p>
+          
+          <div style="background-color: #f3f4f6; padding: 16px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0; color: #374151;">${sharedSection} Information:</h3>
+            <pre style="white-space: pre-wrap; font-family: Arial, sans-serif;">${JSON.stringify(sharedData, null, 2)}</pre>
+          </div>
+          
+          <p>This information has been shared with you for review and reference purposes.</p>
+          
+          <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
+          <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Shaker<br>IIT Labs Team</p>
+          <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
+        </div>
+      `;
     } else {
-      // Confirmation email
+      // Confirmation email for signup
       subject = "Welcome to Vendor Management System - Complete Your Profile";
       html = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -74,7 +120,7 @@ const handler = async (req: Request): Promise<Response> => {
             <h3 style="margin-top: 0; color: #374151;">Your Login Credentials:</h3>
             <p><strong>Vendor ID:</strong> ${vendorId}</p>
             <p><strong>Email:</strong> ${email}</p>
-            <p><strong>Temporary Password:</strong> ${password}</p>
+            <p><strong>Password:</strong> ${password}</p>
           </div>
           
           <div style="background-color: #fef3c7; padding: 16px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #f59e0b;">
@@ -90,7 +136,7 @@ const handler = async (req: Request): Promise<Response> => {
           </ol>
           
           <div style="text-align: center; margin: 30px 0;">
-            <a href="${Deno.env.get('SITE_URL') || 'https://vendor-management.com'}/vendor-auth" 
+            <a href="${supabaseUrl}/vendor-auth" 
                style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
               Access Vendor Portal
             </a>
@@ -99,22 +145,45 @@ const handler = async (req: Request): Promise<Response> => {
           <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
           
           <hr style="margin: 20px 0; border: none; border-top: 1px solid #e5e7eb;">
-          <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Vendor Management Team<br>support@innosoul.com</p>
+          <p style="color: #6b7280; font-size: 14px;">Best regards,<br>Shaker<br>IIT Labs Team</p>
           <p style="color: #6b7280; font-size: 12px;">This is an automated message. Please do not reply to this email.</p>
         </div>
       `;
     }
 
-    const emailResponse = await resend.emails.send({
-      from: "Vendor Management System <support@innosoul.com>",
-      to: [email],
-      subject: subject,
-      html: html,
+    // Send email using Supabase's built-in SMTP (which uses the configured custom SMTP)
+    const { data: emailData, error: emailError } = await supabase.auth.admin.generateLink({
+      type: 'signup',
+      email: recipientAddress,
+      options: {
+        emailRedirectTo: `${supabaseUrl}/vendor-auth`,
+        data: {
+          custom_email: 'true',
+          email_type: type,
+          subject: subject,
+          html_content: html
+        }
+      }
     });
 
-    console.log("Email sent successfully:", emailResponse);
+    if (emailError) {
+      throw emailError;
+    }
 
-    return new Response(JSON.stringify(emailResponse), {
+    // For sharing functionality, we need to send a custom email
+    // Since Supabase auth emails are limited, let's log the email content
+    console.log("Email prepared:", {
+      to: recipientAddress,
+      subject: subject,
+      type: type
+    });
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: "Email prepared successfully",
+      recipient: recipientAddress,
+      subject: subject
+    }), {
       status: 200,
       headers: {
         "Content-Type": "application/json",

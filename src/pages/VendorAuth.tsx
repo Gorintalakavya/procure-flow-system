@@ -41,17 +41,18 @@ const VendorAuth = () => {
     }
   }, []);
 
-  const sendConfirmationEmail = async (email: string, vendorId: string, action: string) => {
+  const sendConfirmationEmail = async (email: string, vendorId: string, type: string, password?: string, vendorName?: string) => {
     try {
-      console.log(`🚀 Sending confirmation email for ${action} to ${email}`);
+      console.log(`🚀 Sending ${type} email to ${email}`);
       
       const { error } = await supabase.functions.invoke('send-confirmation-email', {
         body: {
           email,
           vendorId,
-          section: 'vendor',
-          action,
-          apiKey: 'default-key'
+          vendorName,
+          password,
+          type,
+          isAdmin: false
         }
       });
 
@@ -133,7 +134,7 @@ const VendorAuth = () => {
         timestamp: new Date().toISOString()
       });
 
-      const emailSent = await sendConfirmationEmail(userData.email, userData.vendor_id || '', 'signin');
+      const emailSent = await sendConfirmationEmail(userData.email, userData.vendor_id || '', 'signin_confirmation', undefined, vendorData.legal_entity_name);
       
       console.log('✅ Vendor login successful');
       
@@ -251,7 +252,7 @@ const VendorAuth = () => {
         timestamp: new Date().toISOString()
       });
 
-      const emailSent = await sendConfirmationEmail(newUser.email, newUser.vendor_id || '', 'signup');
+      const emailSent = await sendConfirmationEmail(newUser.email, newUser.vendor_id || '', 'confirmation', signupData.password, vendorData.legal_entity_name);
       
       console.log('✅ Vendor account created successfully');
       
@@ -295,7 +296,7 @@ const VendorAuth = () => {
         return;
       }
 
-      const emailSent = await sendConfirmationEmail(forgotPasswordEmail, existingUser.vendor_id || '', 'forgot-password');
+      const emailSent = await sendConfirmationEmail(forgotPasswordEmail, existingUser.vendor_id || '', 'password_reset');
       
       if (emailSent) {
         toast.success('Password reset instructions sent to your email');
